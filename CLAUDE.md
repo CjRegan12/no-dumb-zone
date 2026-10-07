@@ -24,5 +24,5 @@ Claude Code plugin: Stop hook forces a handoff past a token limit, PermissionReq
 - Transcript layout: `type: "assistant"` lines carry `message.usage` with `input_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`; their sum is the live context. Verified against real transcripts.
 - A `claude -p` run started from inside a Claude session inherits the parent `session_id`, so clear `~/.claude/plugins/data/no-dumb-zone-*/` markers between end-to-end runs.
 - The Cowork workspace on Windows is an Ubuntu 22.04 VM (node 22, python3, jq, git). Hooks run there as on Linux.
-- Committing from the Cowork VM into a mounted Windows folder leaves `.git/*.lock` and `objects/*/tmp_obj_*` behind unless deletion is enabled for the folder; remove them afterwards or the next git command fails.
+- Committing from the Cowork VM into a mounted Windows folder leaves `.git/*.lock` and `objects/*/tmp_obj_*` behind unless deletion is enabled for the folder (ask with `device_request_delete_permission`, then `find .git \( -name '*.lock' -o -name 'tmp_obj_*' \) -type f -delete`); remove them or the next git command fails.
 - Debug a hook: `claude --debug-file ndz.log`, then grep the log for the hook name.
