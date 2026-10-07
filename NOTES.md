@@ -21,8 +21,7 @@
 
 ## Next steps
 1. Baseline cut, only when CJ has no other sessions running: turn off Figma, Vercel, Supabase and the unused bundles (product-management, design, engineering, marketing, productivity, figma, cowork-plugin-management; anthropic-skills too for the floor), start a task in this folder with the first message `no-dumb-zone: baseline cut (1). Connectors and plugin bundles are off for this task. Measure this task's first assistant message context with the command in CLAUDE.md, compare with the 131,846 and 132,249 before-numbers in NOTES.md, record the result in CLAUDE.md's baseline gotcha and in NOTES.md, commit.` Expect a drop toward 90-100k.
-2. User: move the GateGuard gotcha line from the per-project `CLAUDE.md` files (InkBook, agency) into `C:\Users\regan\.claude\CLAUDE.md`. Not in this repo.
-3. Use the plugin on InkBook for a day, then decide nag frequency, auto-commit vs stage-only, and whether project repos commit `NOTES.md` or gitignore it.
+2. Use the plugin on InkBook for a day, then decide nag frequency, auto-commit vs stage-only, and whether project repos commit `NOTES.md` or gitignore it.
 
 ## Open questions for the user
 - After a week at 600k in Cowork: any sign of the dumb zone (wrong file edits, forgotten constraints, repeated mistakes late in a task)? If yes, the data says 400k; `/no-dumb-zone:limit 400k` carries from task to task without a re-upload.
