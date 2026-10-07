@@ -1,0 +1,22 @@
+{
+  "name": "cjregan",
+  "description": "CJ Regan's Claude Code plugins",
+  "owner": {
+    "name": "CJ Regan",
+    "url": "https://github.com/CjRegan12"
+  },
+  "plugins": [
+    {
+      "name": "no-dumb-zone",
+      "source": ".",
+      "description": "Hands off and clears before context gets dumb. Past a token limit, the next time Claude stops it writes NOTES.md + CLAUDE.md, commits, and tells you to start fresh. The next session starts briefed. Terminal and Cowork.",
+      "category": "productivity",
+      "tags": [
+        "context",
+        "handoff",
+        "hooks",
+        "cowork"
+      ]
+    }
+  ]
+}

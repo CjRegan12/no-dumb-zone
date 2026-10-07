@@ -35,31 +35,39 @@ So in Cowork the handoff ends with two lines: the confirmation, and a line like 
 
 ## Install
 
-**Try it for one session** (PowerShell on Windows):
+**From GitHub (terminal, VS Code, Claude Code on the web):**
 
-```powershell
-claude --plugin-dir C:\Users\regan\source\repos\no-dumb-zone
+```
+claude plugin marketplace add CjRegan12/no-dumb-zone
+claude plugin install no-dumb-zone@cjregan
 ```
 
-macOS or Linux: same flag, your path.
+This does not reach Cowork; for that, upload the zip (below).
+
+**Try it for one session without installing** (PowerShell on Windows; macOS and Linux use the same flag):
+
+```powershell
+git clone https://github.com/CjRegan12/no-dumb-zone
+claude --plugin-dir .\no-dumb-zone
+```
 
 **Install everywhere at once (Cowork + terminal):** zip the folder contents and upload under Customize > Plugins > Add > Upload plugin in the desktop app:
 
 ```powershell
-cd C:\Users\regan\source\repos\no-dumb-zone
+cd path\to\no-dumb-zone
 mkdir dist -Force | Out-Null
-tar -a -c -f dist\no-dumb-zone-plugin.zip .claude-plugin .gitignore README.md hooks scripts skills
+tar -a -c -f dist\no-dumb-zone-plugin.zip .claude-plugin/plugin.json .gitignore README.md hooks scripts skills
 ```
 
 Use `tar -a`, not `Compress-Archive`: the latter writes backslash entry names that Linux unzippers read as flat filenames. Hooks and skills both load in Cowork, and the same install reaches your terminal sessions as `no-dumb-zone@synced` at the next session start. After changing the plugin, re-zip and re-upload; running sessions keep the old version, new ones get the new one.
 
-**Terminal only, without the account:** keep using `--plugin-dir`, or set it once per shell with `$env:CLAUDE_CODE_PLUGIN_DIRS = "C:\Users\regan\source\repos\no-dumb-zone"`.
+**Terminal only, from a local clone:** keep using `--plugin-dir`, or set it once per shell with `$env:CLAUDE_CODE_PLUGIN_DIRS = "C:\path\to\no-dumb-zone"`.
 
 ## Configure
 
 | Setting | Where | Default | Notes |
 | --- | --- | --- | --- |
-| `NDZ_LIMIT` | `env` block in `~/.claude/settings.json` (`C:\Users\regan\.claude\settings.json`), or a project's `.claude/settings.json` | `250000` | Tokens. Must be below your auto-compact point or the hook never fires. On a 200k model use ~130000. |
+| `NDZ_LIMIT` | `env` block in `~/.claude/settings.json` (`%USERPROFILE%\.claude\settings.json` on Windows), or a project's `.claude/settings.json` | `250000` | Tokens. Must be below your auto-compact point or the hook never fires. On a 200k model use ~130000. |
 | `autoCompactEnabled` | same settings file | `true` | Set `false` to let this plugin replace compaction instead of racing it. |
 | `/no-dumb-zone:limit` | a skill; `/no-dumb-zone:limit 100000`, `100k`, `show`, `clear` | | Writes, prints or removes the `limit` file below and tells you which limit the hook will actually use. Works in the terminal and inside a Cowork task. Claude also runs it when you say "lower the handoff limit to 100k". |
 | `limit` file | `$CLAUDE_PLUGIN_DATA/limit` (`~/.claude/plugins/data/no-dumb-zone-synced/limit` for the uploaded plugin, `.../no-dumb-zone-inline/limit` for `--plugin-dir`) | none | One number. Used when `NDZ_LIMIT` is unset. The only way to change the limit from inside a Cowork task, where env vars can't be set. In the terminal it persists across sessions; a Cowork container is thrown away with the task, so there it lasts one task. |
@@ -107,8 +115,10 @@ Set a tiny limit in a scratch repo so the hook fires on the very first stop:
 ```powershell
 mkdir $env:TEMP\ndz-test; cd $env:TEMP\ndz-test; git init
 $env:NDZ_LIMIT = "1000"
-claude --plugin-dir C:\Users\regan\source\repos\no-dumb-zone
+claude --plugin-dir C:\path\to\no-dumb-zone
 ```
+
+Or, with the plugin installed, skip the env var and type `/no-dumb-zone:limit 1000` as your first message.
 
 Ask for one small thing. Claude should finish it, then run the handoff and tell you to `/clear`. Clear, type anything, and the session title should match the first line of `NOTES.md`. Remove `$env:NDZ_LIMIT` afterwards (`Remove-Item Env:NDZ_LIMIT`) or close the terminal.
 
@@ -124,6 +134,7 @@ Run a hook by hand with fake input:
 
 - **Nothing happens at the limit.** Auto-compact probably fired first. Lower the limit (`/no-dumb-zone:limit 130000`) or set `autoCompactEnabled: false`.
 - **`/no-dumb-zone:limit` wrote the file but the hook still uses the old number.** `NDZ_LIMIT` in the environment wins over the file; `/no-dumb-zone:limit show` says so when that is the case. In Cowork the file is per task, so a limit set in one task does not carry into the next.
+- **`claude plugin list` says `no-dumb-zone@synced` was not loaded.** You also installed it from the marketplace or `--plugin-dir`. Same name, so the terminal loads only the local copy and skips the synced one; Cowork is unaffected and keeps running the synced copy. Pick one for the terminal (`claude plugin uninstall no-dumb-zone@cjregan` to go back to synced).
 - **Cowork task started without the folder connected.** The pickup hook still fires; it tells Claude to request access to the project folder rather than search its workspace. Connecting the folder when you start the task skips that step.
 - **`<hook> hook error` in the transcript.** Run `claude --debug-file ndz.log` and read the log. Usually `node` isn't on PATH for the process that launched Claude, or the transcript layout changed; `ndz-check.js` looks for `message.usage` on `type: assistant` lines.
 - **Session didn't get named (terminal).** The hook skips sessions that already have a title (`--name`, `/rename`). It also only acts on the first prompt; check `/hooks` to confirm `UserPromptSubmit` is listed.
