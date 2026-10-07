@@ -284,6 +284,27 @@ OUT=$(node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D9" show 2>"$T/err"); COD
 OUT=$(NDZ_SURFACE=cowork node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D9" 550k 2>"$T/err"); CODE=$?
 [ $CODE -eq 0 ] && [[ "$OUT" == *"was 600,000, the Cowork default"* ]] && [[ "$OUT" != *"Above the"* ]] && ok "42 limit set 550k in Cowork: was the Cowork default, no above-default warning" || fail "42 cowork set" "code=$CODE out=$OUT"
 
+echo "== handoff skill: staging from a Windows checkout (0.3.1) =="
+
+# A file committed LF but CRLF on disk (a Windows checkout seen from the Cowork VM) must not be staged by the
+# skill's Cowork command; a real edit still is, stored LF; a file the repo stores as CRLF keeps its CRLF.
+G="$T/crlf"; mkdir -p "$G"; (
+  cd "$G" && git init -q . && git config user.email t@t && git config user.name t && git config commit.gpgsign false
+  printf 'one\ntwo\n' > lf.txt; printf 'x\r\ny\r\n' > crlf.txt
+  git -c core.autocrlf=false add lf.txt crlf.txt && git commit -qm base
+  printf 'one\r\ntwo\r\n' > lf.txt                                                  # phantom: same text, CRLF on disk
+  git -c core.autocrlf=input add -A 2>/dev/null
+  S1=$(git diff --cached --name-only | tr '\n' ' ')
+  printf 'one\r\ntwo\r\nthree\r\n' > lf.txt; printf 'x\r\ny\r\nz\r\n' > crlf.txt    # real edits, both typed with CRLF
+  git -c core.autocrlf=input add -A 2>/dev/null
+  S2=$(git diff --cached --name-only | tr '\n' ' ')
+  LFCR=$(git cat-file -p :lf.txt | grep -c $'\r'); CRCR=$(git cat-file -p :crlf.txt | grep -c $'\r')
+  echo "$S1|$S2|$LFCR|$CRCR"
+) > "$T/crlf.out" 2>&1
+R=$(tail -1 "$T/crlf.out")
+[[ "$R" == "|crlf.txt lf.txt |0|3" ]] && ok "43 git -c core.autocrlf=input add -A: phantom not staged; real edits staged, LF file stays LF, CRLF file stays CRLF" || fail "43 autocrlf staging" "got=$R"
+grep -q 'git -c core.autocrlf=input add -A' "$PLUGIN/skills/handoff/SKILL.md" && ok "43b handoff skill stages the Cowork commit with that command" || fail "43b skill text" "command missing from skills/handoff/SKILL.md"
+
 echo
 echo "$PASS passed, $FAIL failed"
 rm -rf "$T"

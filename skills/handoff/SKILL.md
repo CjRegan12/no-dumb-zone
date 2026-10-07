@@ -69,7 +69,7 @@ git commit -m "handoff: <task> (<n>)"
 
 If the uncommitted work is clearly half-finished, still commit it, with `wip: ` in front of the message. The next session can amend. If this is not a git repo, skip this step and say so.
 
-Cowork only: if git refuses for lack of an identity, take it from the last commit (`git log -1 --format='%an <%ae>'`) and pass it inline with `git -c user.name=... -c user.email=... commit ...`. Committing from the device shell can leave `.git/index.lock` or `.git/objects/*/tmp_obj_*` behind; if `git status` afterwards complains about a lock, delete those files, and if deletion is not permitted, name them in the final line so the user can.
+Cowork only: stage with `git -c core.autocrlf=input add -A` instead of the plain command. The folder is a Windows checkout, so a file nobody touched can show as modified (CRLF on disk, LF in the index); with that flag git compares after normalizing line endings, so the phantom stays out of the commit while real edits still go in. Ignore the `CRLF will be replaced by LF` warnings. If git refuses for lack of an identity, take it from the last commit (`git log -1 --format='%an <%ae>'`) and pass it inline with `git -c user.name=... -c user.email=... commit ...`. Committing from the device shell can leave `.git/index.lock` or `.git/objects/*/tmp_obj_*` behind; if `git status` afterwards complains about a lock, delete those files, and if deletion is not permitted, name them in the final line so the user can.
 
 ## 4. Stop
 
