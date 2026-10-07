@@ -88,7 +88,10 @@ function main() {
       `($HOME/mnt/<folder>/${NOTES_FILE} in the device shell). Reading that file before anything ` +
       "else is how this session continues where the last one stopped: its Next steps section is " +
       "the plan, and CLAUDE.md beside it holds durable project facts. " +
-      `No ${NOTES_FILE} means there is no handoff to pick up.`;
+      `No ${NOTES_FILE} means there is no handoff to pick up. ` +
+      "If no folder is connected yet, do not search this workspace for it: request access to " +
+      "the project folder on the user's computer (its path is usually in the user's message or " +
+      "project memory), or ask the user to add the folder.";
   } else {
     const branch = gitBranch(root);
     if (branch && branch !== "main" && branch !== "master") {

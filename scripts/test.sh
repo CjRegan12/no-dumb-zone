@@ -154,6 +154,7 @@ d = json.loads(sys.argv[1])["hookSpecificOutput"]
 assert d["hookEventName"] == "UserPromptSubmit"
 assert "sessionTitle" not in d, d
 assert "$HOME/mnt/<folder>/NOTES.md" in d["additionalContext"], d
+assert "request access" in d["additionalContext"], d
 PY
 
 OUT=$(echo '{"session_id":"c1","cwd":"'"$CLAUDE_PROJECT_DIR"'","prompt":"again"}' | NDZ_SURFACE=cowork node "$PLUGIN/scripts/ndz-pickup.js" 2>"$T/err"); CODE=$?
@@ -167,6 +168,21 @@ import json, sys
 d = json.loads(sys.argv[1])["hookSpecificOutput"]
 assert "wire the webhook" in d["additionalContext"], d
 PY
+
+echo "== limit file =="
+
+# $CLAUDE_PLUGIN_DATA/limit is honored when NDZ_LIMIT is unset, NDZ_LIMIT still wins, and pruning leaves the file alone
+echo 100000 > "$CLAUDE_PLUGIN_DATA/limit"
+touch -d '10 days ago' "$CLAUDE_PLUGIN_DATA/limit"
+OUT=$(echo '{"session_id":"l1","transcript_path":"'"$BIG"'","stop_hook_active":false}' | NDZ_LIMIT= node "$PLUGIN/scripts/ndz-check.js" 2>"$T/err"); CODE=$?; ERR=$(cat "$T/err")
+[ $CODE -eq 2 ] && [[ "$ERR" == *"100,000 limit"* ]] && [ -f "$CLAUDE_PLUGIN_DATA/limit" ] \
+  && ok "22 limit file: 180k over file limit 100k, exit 2, old limit file not pruned" || fail "22 limit file" "code=$CODE err=$ERR ls=$(ls $CLAUDE_PLUGIN_DATA)"
+run_check '{"session_id":"l2","transcript_path":"'"$BIG"'","stop_hook_active":false}' 250000
+[ $CODE -eq 0 ] && [ -z "$OUT" ] && ok "23 NDZ_LIMIT=250000 beats limit file 100k: silent" || fail "23 env beats file" "code=$CODE err=$ERR"
+echo "garbage" > "$CLAUDE_PLUGIN_DATA/limit"
+OUT=$(echo '{"session_id":"l3","transcript_path":"'"$BIG"'","stop_hook_active":false}' | NDZ_LIMIT= node "$PLUGIN/scripts/ndz-check.js" 2>"$T/err"); CODE=$?
+[ $CODE -eq 0 ] && [ -z "$OUT" ] && ok "24 unparseable limit file: default 250k, silent" || fail "24 bad limit file" "code=$CODE out=$OUT"
+rm -f "$CLAUDE_PLUGIN_DATA/limit"
 
 echo
 echo "$PASS passed, $FAIL failed"

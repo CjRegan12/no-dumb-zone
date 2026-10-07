@@ -32,7 +32,8 @@ function markerPath(kind, sessionId) {
 }
 
 /** Markers are keyed by session id and never reused once a session is gone.
- *  Drop anything older than a week so the data dir doesn't grow forever. */
+ *  Drop any older than a week so the data dir doesn't grow forever. Only
+ *  marker files are touched; the optional `limit` file is the user's. */
 function pruneOldMarkers() {
   const cutoff = Date.now() - MARKER_MAX_AGE_MS;
   let names = [];
@@ -42,6 +43,7 @@ function pruneOldMarkers() {
     return;
   }
   for (const name of names) {
+    if (!/^(handoff|pickup)-/.test(name)) continue;
     const p = path.join(dataDir(), name);
     try {
       if (fs.statSync(p).mtimeMs < cutoff) fs.unlinkSync(p);
