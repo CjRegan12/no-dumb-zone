@@ -15,7 +15,7 @@ What the argument means:
 
 - a token count such as `100000`, `100k` or `0.5m`: write it to the plugin's `limit` file. The Stop hook uses it from the next stop on, unless `NDZ_LIMIT` is set in the environment, which always wins.
 - `show`, or no argument: print the limit the Stop hook will use and where it comes from.
-- `clear`: delete the file and go back to `NDZ_LIMIT` or the 250,000 default.
+- `clear`: delete the file and go back to `NDZ_LIMIT` or the default: 500,000 in the terminal, 600,000 in Cowork.
 
 Rules:
 

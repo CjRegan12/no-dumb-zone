@@ -8,7 +8,7 @@
  *   show       print the limit the Stop hook will use and where it comes from. Default.
  *   clear      delete DIR/limit; the hook goes back to NDZ_LIMIT or the default.
  *
- * The Stop hook reads NDZ_LIMIT, then DIR/limit, then 250000. Hooks get DIR from
+ * The Stop hook reads NDZ_LIMIT, then DIR/limit, then the surface default (500000 terminal, 600000 Cowork). Hooks get DIR from
  * Claude Code as CLAUDE_PLUGIN_DATA; the Bash tool does not, so the skill passes
  * ${CLAUDE_PLUGIN_DATA} in as --data-dir. Without it this falls back to the same
  * place the hooks fall back to (ndz-common dataDir()).
@@ -24,7 +24,7 @@ const {
   limitFilePath,
   limitFromFile,
   resolveLimit,
-  DEFAULT_LIMIT,
+  defaultLimit,
   TEST_SIZED_BELOW,
   parseTokens,
   writeLimitFile,
@@ -33,6 +33,7 @@ const {
 const USAGE = "usage: node ndz-limit.js [--data-dir DIR] [show | clear | <tokens>]  (tokens: 100000, 100k, 0.5m)";
 
 const fmt = (n) => n.toLocaleString("en-US");
+const DEFAULT_WORD = isCowork() ? "the Cowork default" : "the terminal default";
 
 function parseArgs(argv) {
   const out = { dir: "", cmd: "show", raw: "" };
@@ -78,7 +79,7 @@ function describe(dir) {
   const file = limitFilePath(dir);
   const fileVal = limitFromFile(dir);
   const env = positiveInt(process.env.NDZ_LIMIT);
-  const why = { env: "from NDZ_LIMIT", file: "from the limit file", default: "the default" }[source];
+  const why = { env: "from NDZ_LIMIT", file: "from the limit file", default: DEFAULT_WORD }[source];
   const lines = [
     `no-dumb-zone limit: ${fmt(limit)} tokens (${why}).`,
     `  limit file: ${file} (${fileVal ? fmt(fileVal) : fs.existsSync(file) ? "present but not a number" : "absent"})`,
@@ -114,7 +115,7 @@ function main(argv) {
     const { limit, source } = resolveLimit(dir);
     process.stdout.write(
       (had ? `Removed ${file}. ` : `No limit file at ${file}. `) +
-        `The Stop hook now uses ${fmt(limit)} tokens (${source === "env" ? "NDZ_LIMIT" : "the default"}).\n`
+        `The Stop hook now uses ${fmt(limit)} tokens (${source === "env" ? "NDZ_LIMIT" : DEFAULT_WORD}).\n`
     );
     return 0;
   }
@@ -129,7 +130,7 @@ function main(argv) {
   const env = positiveInt(process.env.NDZ_LIMIT);
 
   const out = [
-    `no-dumb-zone limit set to ${fmt(tokens)} tokens (was ${fmt(before.limit)}, ${before.source === "default" ? "the default" : "from " + (before.source === "env" ? "NDZ_LIMIT" : "the limit file")}).`,
+    `no-dumb-zone limit set to ${fmt(tokens)} tokens (was ${fmt(before.limit)}, ${before.source === "default" ? DEFAULT_WORD : "from " + (before.source === "env" ? "NDZ_LIMIT" : "the limit file")}).`,
     `  file: ${file}`,
     `  ${whereItLands(tokens)} Takes effect the next time Claude stops.`,
   ];
@@ -141,8 +142,8 @@ function main(argv) {
   if (tokens < 10000) {
     out.push(`  ${fmt(tokens)} is a test-sized limit: the handoff will fire at the very next stop.`);
   }
-  if (tokens > DEFAULT_LIMIT) {
-    out.push(`  Above the ${fmt(DEFAULT_LIMIT)} default. Make sure it is still below your auto-compact point or the hook never fires.`);
+  if (tokens > defaultLimit()) {
+    out.push(`  Above the ${fmt(defaultLimit())} default. Make sure it is still below your auto-compact point or the hook never fires.`);
   }
   process.stdout.write(out.join("\n") + "\n");
   return 0;

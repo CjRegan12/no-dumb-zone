@@ -181,7 +181,7 @@ run_check '{"session_id":"l2","transcript_path":"'"$BIG"'","stop_hook_active":fa
 [ $CODE -eq 0 ] && [ -z "$OUT" ] && ok "23 NDZ_LIMIT=250000 beats limit file 100k: silent" || fail "23 env beats file" "code=$CODE err=$ERR"
 echo "garbage" > "$CLAUDE_PLUGIN_DATA/limit"
 OUT=$(echo '{"session_id":"l3","transcript_path":"'"$BIG"'","stop_hook_active":false}' | NDZ_LIMIT= node "$PLUGIN/scripts/ndz-check.js" 2>"$T/err"); CODE=$?
-[ $CODE -eq 0 ] && [ -z "$OUT" ] && ok "24 unparseable limit file: default 250k, silent" || fail "24 bad limit file" "code=$CODE out=$OUT"
+[ $CODE -eq 0 ] && [ -z "$OUT" ] && ok "24 unparseable limit file: terminal default 500k, silent" || fail "24 bad limit file" "code=$CODE out=$OUT"
 rm -f "$CLAUDE_PLUGIN_DATA/limit"
 
 echo "== ndz-limit.js (/no-dumb-zone:limit) =="
@@ -189,7 +189,7 @@ echo "== ndz-limit.js (/no-dumb-zone:limit) =="
 # --data-dir is what the skill passes from ${CLAUDE_PLUGIN_DATA}; it must beat the env fallback
 D2="$T/data2"
 OUT=$(node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D2" 100k 2>"$T/err"); CODE=$?
-[ $CODE -eq 0 ] && [ "$(cat "$D2/limit")" = "100000" ] && [ ! -f "$CLAUDE_PLUGIN_DATA/limit" ] && [[ "$OUT" == *"100,000"* ]] && [[ "$OUT" == *"was 250,000"* ]] \
+[ $CODE -eq 0 ] && [ "$(cat "$D2/limit")" = "100000" ] && [ ! -f "$CLAUDE_PLUGIN_DATA/limit" ] && [[ "$OUT" == *"100,000"* ]] && [[ "$OUT" == *"was 500,000, the terminal default"* ]] \
   && ok "25 limit set 100k: writes 100000 to --data-dir only, reports old and new" || fail "25 limit set" "code=$CODE out=$OUT err=$(cat $T/err)"
 
 # the hook honors what the script wrote, in that same dir
@@ -202,7 +202,7 @@ OUT=$(NDZ_LIMIT=130000 node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D2" 2>"$
 [ $CODE -eq 0 ] && [[ "$OUT" == *"130,000 tokens (from NDZ_LIMIT)"* ]] && [[ "$OUT" == *"takes precedence"* ]] && ok "27b limit show with NDZ_LIMIT set: env wins, says so" || fail "27b show env" "code=$CODE out=$OUT"
 
 OUT=$(node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D2" clear 2>"$T/err"); CODE=$?
-[ $CODE -eq 0 ] && [ ! -f "$D2/limit" ] && [[ "$OUT" == *"250,000"* ]] && ok "28 limit clear: file gone, reports the default" || fail "28 limit clear" "code=$CODE out=$OUT ls=$(ls $D2)"
+[ $CODE -eq 0 ] && [ ! -f "$D2/limit" ] && [[ "$OUT" == *"500,000 tokens (the terminal default)"* ]] && ok "28 limit clear: file gone, reports the default" || fail "28 limit clear" "code=$CODE out=$OUT ls=$(ls $D2)"
 
 for bad in abc 0 -5 "1 2"; do
   OUT=$(node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D2" $bad 2>"$T/err"); CODE=$?
@@ -211,8 +211,8 @@ done
 [ "$bad" != FAILED ] && ok "29 limit rejects abc, 0, -5, two args: exit 1, usage on stderr, no file"
 
 # empty or unsubstituted --data-dir falls back to the hooks' own dataDir()
-OUT=$(node "$PLUGIN/scripts/ndz-limit.js" --data-dir "" 0.5m 2>"$T/err"); CODE=$?
-[ $CODE -eq 0 ] && [ "$(cat "$CLAUDE_PLUGIN_DATA/limit")" = "500000" ] && [[ "$OUT" == *"Above the 250,000 default"* ]] && ok "30 empty --data-dir: falls back to CLAUDE_PLUGIN_DATA, 0.5m parses, warns above default" || fail "30 fallback dir" "code=$CODE out=$OUT"
+OUT=$(node "$PLUGIN/scripts/ndz-limit.js" --data-dir "" 0.7m 2>"$T/err"); CODE=$?
+[ $CODE -eq 0 ] && [ "$(cat "$CLAUDE_PLUGIN_DATA/limit")" = "700000" ] && [[ "$OUT" == *"Above the 500,000 default"* ]] && ok "30 empty --data-dir: falls back to CLAUDE_PLUGIN_DATA, 0.7m parses, warns above default" || fail "30 fallback dir" "code=$CODE out=$OUT"
 rm -f "$CLAUDE_PLUGIN_DATA/limit"
 
 echo "== Cowork limit carry-over =="
@@ -266,6 +266,23 @@ OUT3=$(NDZ_SURFACE=cowork node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D5" 1
   && ok "37 limit set/show in Cowork: says the paste line carries it; 1k says test-sized, not carried" || fail "37 limit cowork wording" "out=$OUT out2=$OUT2 out3=$OUT3"
 OUT=$(node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D5" show 2>"$T/err")
 [[ "$OUT" != *"next task"* ]] && ok "37b limit show in the terminal: no Cowork line" || fail "37b terminal show" "out=$OUT"
+
+echo "== surface-aware defaults (0.3.0) =="
+
+# 550k transcript: over the 500k terminal default, under the 600k Cowork default
+MID="$T/mid.jsonl"
+echo '{"type":"assistant","message":{"role":"assistant","usage":{"input_tokens":1000,"cache_read_input_tokens":549000,"cache_creation_input_tokens":0}}}' > "$MID"
+D9="$T/data9"; mkdir -p "$D9"
+OUT=$(echo '{"session_id":"d1","transcript_path":"'"$MID"'","stop_hook_active":false}' | NDZ_LIMIT= CLAUDE_PLUGIN_DATA="$D9" node "$PLUGIN/scripts/ndz-check.js" 2>"$T/err"); CODE=$?; ERR=$(cat "$T/err")
+[ $CODE -eq 2 ] && [[ "$ERR" == *"550,000 tokens, over the 500,000 limit"* ]] && ok "38 terminal default: 550k fires at 500k" || fail "38 terminal default" "code=$CODE err=$ERR"
+OUT=$(echo '{"session_id":"d2","transcript_path":"'"$MID"'","stop_hook_active":false}' | NDZ_SURFACE=cowork NDZ_LIMIT= CLAUDE_PLUGIN_DATA="$D9" node "$PLUGIN/scripts/ndz-check.js" 2>"$T/err"); CODE=$?; ERR=$(cat "$T/err")
+[ $CODE -eq 0 ] && [ -z "$OUT" ] && [ ! -f "$D9/handoff-d2" ] && ok "39 Cowork default: 550k is under 600k, silent" || fail "39 cowork default" "code=$CODE out=$OUT err=$ERR"
+OUT=$(NDZ_SURFACE=cowork node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D9" show 2>"$T/err"); CODE=$?
+[ $CODE -eq 0 ] && [[ "$OUT" == *"600,000 tokens (the Cowork default)"* ]] && ok "40 limit show in Cowork: 600,000, names the Cowork default" || fail "40 cowork show" "code=$CODE out=$OUT"
+OUT=$(node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D9" show 2>"$T/err"); CODE=$?
+[ $CODE -eq 0 ] && [[ "$OUT" == *"500,000 tokens (the terminal default)"* ]] && ok "41 limit show in terminal: 500,000, names the terminal default" || fail "41 terminal show" "code=$CODE out=$OUT"
+OUT=$(NDZ_SURFACE=cowork node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D9" 550k 2>"$T/err"); CODE=$?
+[ $CODE -eq 0 ] && [[ "$OUT" == *"was 600,000, the Cowork default"* ]] && [[ "$OUT" != *"Above the"* ]] && ok "42 limit set 550k in Cowork: was the Cowork default, no above-default warning" || fail "42 cowork set" "code=$CODE out=$OUT"
 
 echo
 echo "$PASS passed, $FAIL failed"

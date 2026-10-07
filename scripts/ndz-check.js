@@ -17,8 +17,9 @@
  *   $CLAUDE_PLUGIN_DATA/limit   a file holding one number, written by the
  *                               /no-dumb-zone:limit skill (ndz-limit.js). The
  *                               only knob a Cowork task can turn on itself.
- *   250000                      default. Set your limit below the auto-compact
- *                               point or this never runs.
+ *   500000 / 600000             default, terminal / Cowork (ndz-common.js
+ *                               defaultLimit). Set your limit below the
+ *                               auto-compact point or this never runs.
  */
 
 const fs = require("fs");

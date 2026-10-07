@@ -56,9 +56,22 @@ function pruneOldMarkers() {
 /** The token limit the Stop hook enforces. First one that parses wins:
  *    NDZ_LIMIT env           terminal only; Cowork tasks cannot set env vars
  *    <dataDir>/limit         one number in a file; /no-dumb-zone:limit writes it
- *    DEFAULT_LIMIT
+ *    defaultLimit()          by surface, see below
  *  Shared by ndz-check.js (reads) and ndz-limit.js (reads and writes). */
-const DEFAULT_LIMIT = 250000;
+
+/** Default limits by surface. A Cowork task starts at roughly 130k tokens of
+ *  context before Claude's first turn (Cowork's system prompt plus every
+ *  connector's tool schema); the terminal starts far lower. The higher Cowork
+ *  default gives both surfaces about the same working room. Both sit above
+ *  where the published long-context data bends (~256k): the author chose
+ *  session length over caution. Lower them with /no-dumb-zone:limit or
+ *  NDZ_LIMIT; the plugin still catches the real failure, which is sitting at
+ *  the ~967k auto-compact point for hours. */
+const DEFAULT_LIMIT_TERMINAL = 500000;
+const DEFAULT_LIMIT_COWORK = 600000;
+function defaultLimit() {
+  return isCowork() ? DEFAULT_LIMIT_COWORK : DEFAULT_LIMIT_TERMINAL;
+}
 const LIMIT_FILE = "limit";
 
 function positiveInt(s) {
@@ -84,7 +97,7 @@ function resolveLimit(dir) {
   if (env) return { limit: env, source: "env" };
   const file = limitFromFile(dir);
   if (file) return { limit: file, source: "file" };
-  return { limit: DEFAULT_LIMIT, source: "default" };
+  return { limit: defaultLimit(), source: "default" };
 }
 
 /** Limits below this are test-sized: they fire the handoff at the very next
@@ -143,7 +156,9 @@ module.exports = {
   pruneOldMarkers,
   emit,
   isCowork,
-  DEFAULT_LIMIT,
+  DEFAULT_LIMIT_TERMINAL,
+  DEFAULT_LIMIT_COWORK,
+  defaultLimit,
   LIMIT_FILE,
   positiveInt,
   limitFilePath,
