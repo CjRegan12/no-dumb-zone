@@ -1,40 +1,29 @@
-# no-dumb-zone: v0.2 Cowork mode (6)
+# no-dumb-zone: v0.2 Cowork mode (7)
 
 ## Done this session
-- Step 2 closed for 0.2.2: in a fresh Cowork task, `/no-dumb-zone:limit show` printed `/root/.claude/plugins/data/no-dumb-zone-synced/limit (absent)`, 250,000 default. The data dir has no generation suffix. The pickup's "request the folder" sentence fired and worked (folder requested from project memory, NOTES.md read first).
-- Steps 1 and 3 were already done by the user before this task: `main` pushed, `LICENSE` (MIT) added on GitHub, `license: MIT` in plugin.json (`5b3b486`, `cf1efb7`).
-- Closed the open question with 0.2.3, "Cowork limit carry-over": a limit set with `/no-dumb-zone:limit` inside a Cowork task now survives into the next task. `ndz-check.js` (Cowork, limit from the file, >= 10k) tells the handoff to end its paste line with `Then /no-dumb-zone:limit <n>.`; `skills/handoff/SKILL.md` step 4 appends it; `ndz-pickup.js` parses the first prompt of the next task and writes the limit file before Claude's first turn, then says so in `additionalContext`. `parseTokens`, `limitFromPrompt`, `writeLimitFile`, `TEST_SIZED_BELOW` live in `ndz-common.js`. `ndz-limit.js` set/show in Cowork say whether the limit will carry.
-- Tests 31 to 37b added, 40 pass in the VM. `claude plugin validate` passes for both manifests. Headless `claude -p "inkbook: booking flow (4). Continue from NOTES.md. Then /no-dumb-zone:limit 150k." --plugin-dir <staged copy>` from the container wrote `no-dumb-zone-inline/limit` = 150000 on the first prompt (real hook, not the harness).
-- Commit `239e676` (code, docs, 0.2.3). `dist/no-dumb-zone-plugin.zip` rebuilt at 0.2.3 with python zipfile (12 entries, includes scripts/test.sh like the tar recipe). Not pushed: `git push` from the VM gets a 403 from the proxy.
-- Deletion was approved for the repo folder this task; git locks were cleared after each commit.
+- Steps 1 to 3 of the previous notes verified in a fresh Cowork task: `main` is in sync with `origin/main` (user pushed); the synced copy in the task container is 0.2.3 (`"version": "0.2.3"`, `carries` present in `scripts/ndz-limit.js`, `limitFromPrompt` in `ndz-common.js` and `ndz-pickup.js`); `/no-dumb-zone:limit show` printed `250,000 tokens (the default)`, limit file `/root/.claude/plugins/data/no-dumb-zone-synced/limit (absent)`, `NDZ_LIMIT: unset`. The pickup marker for the session was in the data dir, no limit file, as expected for a first prompt with no carry sentence.
+- Measured this task's context from the transcript: 131,846 tokens at the first assistant message (before any work), 156,014 after reading the repo. A Cowork task's baseline is ~130k.
+- Step 4, the end-to-end carry test, is half done: `/no-dumb-zone:limit 155k` via the skill wrote the file (`set to 155,000 tokens (was 250,000, the default)`, Cowork wording said the paste line carries it). On the next stop `ndz-check.js` fired exit 2 at 161,373 tokens with the carry sentence: `Limit carry-over: ... end the second line of the handoff with " Then /no-dumb-zone:limit 155000." and the next task keeps it.` This handoff is the emit half of the test. The pickup half happens in the task that reads this file.
+- Deletion was approved for the repo folder before the handoff; git locks cleared after the commit.
 
 ## Decisions and why
-- Carry via the paste line, not via NOTES.md or a `show` reminder: the paste line is the only thing that already crosses from one Cowork task to the next, and the pickup hook can act on it deterministically without Claude's cooperation.
-- Test-sized limits (< 10k) are never carried, or a `/no-dumb-zone:limit 1000` test would re-fire the handoff in every task after it.
-- The pickup hook applies any `/no-dumb-zone:limit <n>` in the first prompt, test-sized included: a user who types it wants it. Only the emit side filters.
-- `LICENSE` shows modified from the VM (CRLF vs LF, no autocrlf there). Phantom; not committed. Stage by name from the VM.
+- Test limit 155k, not the 20k the previous notes suggested: a Cowork task is already ~130k before Claude's first turn, so 20k would re-fire the handoff at the end of every following task's first turn, and the carry would make that permanent. 155k fires in this task (161k at stop) and leaves ~25k of headroom in the next one.
+- Staged by name, not `git add -A`, per the CRLF gotcha in CLAUDE.md, even though `LICENSE` showed clean this time.
 
 ## Next steps
-1. User, in PowerShell from `C:\Users\regan\source\repos\no-dumb-zone`: `git push`. If `git status` shows `LICENSE` modified there too, `git checkout -- LICENSE`; it is line endings, not content.
-2. User: upload `dist\no-dumb-zone-plugin.zip` under Customize > Plugins, replacing 0.2.2. Until then Cowork tasks run 0.2.2, which has no carry-over.
-3. First turn of the next Cowork task: `/no-dumb-zone:limit show` should print version-agnostic output as before; confirm the skill text in the task's synced copy mentions "carries" (`grep carries ~/.claude/plugins/synced/*/no-dumb-zone/scripts/ndz-limit.js` in the workspace shell) to prove 0.2.3 is the loaded copy.
-4. Optional end-to-end carry test in Cowork: in a task with this folder connected, `/no-dumb-zone:limit 20000`, work until the handoff fires (20k is above the test-sized cutoff, so it carries), check the handoff's second line ends with `Then /no-dumb-zone:limit 20000.`, start a new task with that line, and `/no-dumb-zone:limit show` there should say 20,000 from the limit file.
+1. This task IS the pickup half of the carry test. If your first message ended with `Then /no-dumb-zone:limit 155000.`, the pickup hook should already have written the limit file and said so in its context. Run `/no-dumb-zone:limit show` now: it must print `155,000 tokens` with source the limit file (`/root/.claude/plugins/data/no-dumb-zone-synced/limit`). That closes 0.2.3's carry-over end to end. If it prints 250,000 default instead, the carry failed: check `ndz-pickup.js` `limitFromPrompt` against the exact first prompt (`cat ~/.claude/projects/*/*.jsonl | head -c 4000` shows it) and whether `ndz-common.js` `writeLimitFile` ran.
+2. Then `/no-dumb-zone:limit clear` in the same turn, so the task runs on the 250k default and the chain stops here. Record the result (pass or fail, exact `show` output) in NOTES.md.
+3. Decide whether `skills/handoff/SKILL.md` step 3 should keep `git add -A`. CLAUDE.md says never `git add -A` from the Cowork VM (CRLF phantom on files checked out on Windows); the skill says `git add -A`. Options: leave it (the phantom only bites when a CRLF file is dirty in the index), or change step 3 to `git add -A` then `git diff --cached --stat` and unstage line-ending-only files. Small change, add a test case if the skill text changes.
+4. Consider whether the pickup hook should refuse a carried limit that is below the surface's baseline (Cowork ~130k). It cannot read the transcript at UserPromptSubmit time, so the only options are a hard floor constant for Cowork or leaving it to the user. Leaning: leave it, document it (done in CLAUDE.md). Decide and close.
 5. User: move the GateGuard gotcha line from the per-project `CLAUDE.md` files (InkBook, agency) into `C:\Users\regan\.claude\CLAUDE.md`. Not in this repo.
 6. Carry over from v0.1: use the plugin on InkBook for a day, then decide nag frequency (every stop vs every third), auto-commit vs stage-only, and whether project repos commit `NOTES.md` or gitignore it.
+7. If anything in this repo changes: bump `.claude-plugin/plugin.json`, `bash scripts/test.sh` (40 cases), rebuild `dist/no-dumb-zone-plugin.zip` (python zipfile from the VM, `tar -a` on Windows), user re-uploads under Customize > Plugins, user `git push` from PowerShell (the VM gets a 403).
 
 ## Open questions for the user
-- Nag frequency, auto-commit vs stage, commit-or-ignore `NOTES.md`: deferred until after a day of real use.
-- Cowork names the chat from the whole first message; with the carry suffix the name may get longer. If that is ugly, the pickup hook could strip it, but only Cowork's own naming would need to change, and the plugin cannot do that.
+- Nag frequency, auto-commit vs stage, commit-or-ignore `NOTES.md`: still deferred until after a day of real use.
+- Cowork names the chat from the whole first message; this handoff's paste line now carries the limit suffix. Is the resulting chat name acceptable?
+- Should the plugin stop a Cowork limit below ~130k from carrying (step 4 above), or is documenting it enough?
 
 ## Files touched
-- scripts/ndz-common.js: `TEST_SIZED_BELOW`, `parseTokens`, `limitFromPrompt`, `writeLimitFile`
-- scripts/ndz-check.js: carry sentence in the Cowork exit-2 text
-- scripts/ndz-pickup.js: applies `/no-dumb-zone:limit <n>` from the first Cowork prompt
-- scripts/ndz-limit.js: shared parser; Cowork wording on set/show
-- skills/handoff/SKILL.md: step 4 appends the carry suffix
-- scripts/test.sh: cases 31 to 37b (40 total)
-- README.md: carry-over paragraph, limit-file row, troubleshooting bullet
-- CLAUDE.md: carry-over convention, 0.2.2 live confirmation, `$HOME=/root`, synced path shape, CRLF gotcha, 40 cases
-- .claude-plugin/plugin.json: 0.2.3
-- dist/no-dumb-zone-plugin.zip: rebuilt 0.2.3 (gitignored)
+- CLAUDE.md: command to measure live context from the transcript; gotcha on the ~130k Cowork baseline and carried-limit chains; data-dir gotcha now says confirmed on 0.2.2 and 0.2.3
 - NOTES.md: this file
