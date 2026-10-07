@@ -66,6 +66,6 @@ If the uncommitted work is clearly half-finished, still commit it, with `wip: ` 
 
 Reply with exactly one line:
 
-`Handoff written: <title line>. Run /clear to start fresh.`
+`Handoff written: <title line>. Start a fresh session: a new task in Cowork, or /clear in the terminal.`
 
 Then stop. Do not continue the task, do not summarize the conversation, do not ask what to do next.

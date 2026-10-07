@@ -1,7 +1,7 @@
 {
   "name": "no-dumb-zone",
-  "version": "0.1.0",
-  "description": "Hands off and clears before context gets dumb. Past a token limit, the next time Claude stops it writes NOTES.md + CLAUDE.md, commits, and tells you to /clear. The fresh session names itself and starts briefed.",
+  "version": "0.1.1",
+  "description": "Hands off and clears before context gets dumb. Past a token limit, the next time Claude stops it writes NOTES.md + CLAUDE.md, commits, and tells you to start a fresh session. The new session names itself and starts briefed.",
   "author": {
     "name": "CJ Regan"
   },

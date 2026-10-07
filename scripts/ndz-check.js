@@ -100,7 +100,8 @@ function main() {
     emit({
       systemMessage:
         `NO DUMB ZONE: context is ${fmt(ctx)} tokens. ` +
-        "The handoff is already written. Run /clear to start fresh.",
+        "The handoff is already written. Start a fresh session: " +
+        "a new task in Cowork, or /clear in the terminal.",
     });
     return 0;
   }

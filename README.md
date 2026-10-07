@@ -8,7 +8,7 @@ Long sessions compacted over and over lose the constraints you stated early, and
 
 1. Every time Claude finishes a turn, a `Stop` hook reads the session transcript and checks the live context size.
 2. Past the limit (default 250k tokens), the hook blocks the stop once and tells Claude to run `/no-dumb-zone:handoff`.
-3. The handoff skill updates `CLAUDE.md` with durable learnings, writes `NOTES.md` with task state and next steps, commits, and tells you to `/clear`.
+3. The handoff skill updates `CLAUDE.md` with durable learnings, writes `NOTES.md` with task state and next steps, commits, and tells you to start a fresh session (a new task in Cowork, or `/clear` in the terminal).
 4. On your first prompt in the fresh session, a `UserPromptSubmit` hook names the session from the first line of `NOTES.md` and feeds the whole file to Claude as context. You continue where you left off at ~20k tokens instead of 250k.
 
 It never interrupts a task. `Stop` only fires when Claude has stopped on its own, so a task in progress always finishes first.
