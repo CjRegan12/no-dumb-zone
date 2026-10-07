@@ -16,6 +16,12 @@
  *                                   reads them itself. Cowork names chats from
  *                                   the first message and ignores sessionTitle,
  *                                   so none is sent.
+ *   Cowork, first prompt ends in "Then /no-dumb-zone:limit <n>."
+ *                                -> the handoff put it there (ndz-check.js)
+ *                                   because the limit file died with the last
+ *                                   task's container. Write it to this task's
+ *                                   limit file here, so the Stop hook has it
+ *                                   before Claude does anything.
  *
  * Why UserPromptSubmit and not SessionStart: SessionStart also accepts
  * sessionTitle but ignores it when the session started from /clear, which is
@@ -25,7 +31,15 @@
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
-const { readHookInput, markerPath, emit, isCowork } = require("./ndz-common");
+const {
+  readHookInput,
+  dataDir,
+  markerPath,
+  emit,
+  isCowork,
+  limitFromPrompt,
+  writeLimitFile,
+} = require("./ndz-common");
 
 const NOTES_FILE = "NOTES.md";
 const MAX_CONTEXT_CHARS = 9000; // Claude Code caps additionalContext at 10k
@@ -67,6 +81,20 @@ function main() {
   const root = projectRoot(inp);
   const notesPath = path.join(root, NOTES_FILE);
   const out = { hookEventName: "UserPromptSubmit" };
+  const cowork = isCowork();
+
+  // Cowork carry-over: apply a limit the previous task's handoff put in the paste line.
+  let carried = 0;
+  if (cowork) {
+    carried = limitFromPrompt(inp.prompt);
+    if (carried) {
+      try {
+        writeLimitFile(dataDir(), carried);
+      } catch {
+        carried = 0;
+      }
+    }
+  }
 
   if (fs.existsSync(notesPath)) {
     const text = fs.readFileSync(notesPath, "utf8");
@@ -80,7 +108,7 @@ function main() {
       `Handoff notes from the previous session (${NOTES_FILE} in the project root). ` +
       "Pick up from the next steps listed here.\n\n" +
       body;
-  } else if (isCowork()) {
+  } else if (cowork) {
     out.additionalContext =
       "no-dumb-zone: this is a Cowork task, so the project folder is on the user's computer, " +
       "not in this workspace, and this hook cannot read it. When a project folder is connected, " +
@@ -97,6 +125,14 @@ function main() {
     if (branch && branch !== "main" && branch !== "master") {
       out.sessionTitle = `${path.basename(root)}: ${branch}`.slice(0, MAX_TITLE_CHARS);
     }
+  }
+
+  if (carried) {
+    out.additionalContext =
+      `no-dumb-zone: the handoff limit for this task is ${carried.toLocaleString("en-US")} tokens, ` +
+      "applied from the /no-dumb-zone:limit in your first message. It is already in place; " +
+      "there is no need to run the limit skill again.\n\n" +
+      (out.additionalContext || "");
   }
 
   fs.writeFileSync(done, "");

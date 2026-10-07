@@ -82,4 +82,6 @@ Cowork only: if git refuses for lack of an identity, take it from the last commi
 `Handoff written: <title line>. Start a new task in this folder and paste the next line as your first message.`
 `<title line>. Continue from NOTES.md.`
 
+If the Stop hook message contains a `Then /no-dumb-zone:limit <n>.` sentence, append it to the second line, so it reads `<title line>. Continue from NOTES.md. Then /no-dumb-zone:limit <n>.` The limit was set inside this task and would otherwise reset in the next one; the plugin reads it from that first message. No such sentence, nothing to append.
+
 Then stop. Do not continue the task, do not summarize the conversation, do not ask what to do next.

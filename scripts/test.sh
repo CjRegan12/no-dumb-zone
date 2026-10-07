@@ -215,6 +215,58 @@ OUT=$(node "$PLUGIN/scripts/ndz-limit.js" --data-dir "" 0.5m 2>"$T/err"); CODE=$
 [ $CODE -eq 0 ] && [ "$(cat "$CLAUDE_PLUGIN_DATA/limit")" = "500000" ] && [[ "$OUT" == *"Above the 250,000 default"* ]] && ok "30 empty --data-dir: falls back to CLAUDE_PLUGIN_DATA, 0.5m parses, warns above default" || fail "30 fallback dir" "code=$CODE out=$OUT"
 rm -f "$CLAUDE_PLUGIN_DATA/limit"
 
+echo "== Cowork limit carry-over =="
+
+# Stop hook in Cowork with a file limit: the exit-2 text carries "Then /no-dumb-zone:limit <n>."
+D3="$T/data3"; mkdir -p "$D3"; echo 150000 > "$D3/limit"
+OUT=$(echo '{"session_id":"k1","transcript_path":"'"$BIG"'","stop_hook_active":false}' | NDZ_SURFACE=cowork NDZ_LIMIT= CLAUDE_PLUGIN_DATA="$D3" node "$PLUGIN/scripts/ndz-check.js" 2>"$T/err"); CODE=$?; ERR=$(cat "$T/err")
+[ $CODE -eq 2 ] && [[ "$ERR" == *'" Then /no-dumb-zone:limit 150000."'* ]] && [[ "$ERR" == *"Surface: Cowork"* ]] \
+  && ok "31 Cowork, file limit 150k: exit 2 text tells the handoff to append Then /no-dumb-zone:limit 150000." || fail "31 carry suffix" "code=$CODE err=$ERR"
+
+# terminal with the same file limit: nothing to carry, the file persists there
+OUT=$(echo '{"session_id":"k2","transcript_path":"'"$BIG"'","stop_hook_active":false}' | NDZ_LIMIT= CLAUDE_PLUGIN_DATA="$D3" node "$PLUGIN/scripts/ndz-check.js" 2>"$T/err"); CODE=$?; ERR=$(cat "$T/err")
+[ $CODE -eq 2 ] && [[ "$ERR" != *"/no-dumb-zone:limit"* ]] && ok "32 terminal, file limit: no carry sentence" || fail "32 terminal no carry" "code=$CODE err=$ERR"
+
+# Cowork with NDZ_LIMIT (env) or a test-sized file limit: no carry sentence
+OUT=$(echo '{"session_id":"k3","transcript_path":"'"$BIG"'","stop_hook_active":false}' | NDZ_SURFACE=cowork NDZ_LIMIT=100000 CLAUDE_PLUGIN_DATA="$D3" node "$PLUGIN/scripts/ndz-check.js" 2>"$T/err"); CODE=$?; ERR=$(cat "$T/err")
+echo 1000 > "$D3/limit"
+OUT2=$(echo '{"session_id":"k4","transcript_path":"'"$BIG"'","stop_hook_active":false}' | NDZ_SURFACE=cowork NDZ_LIMIT= CLAUDE_PLUGIN_DATA="$D3" node "$PLUGIN/scripts/ndz-check.js" 2>"$T/err2"); CODE2=$?; ERR2=$(cat "$T/err2")
+[ $CODE -eq 2 ] && [[ "$ERR" != *"/no-dumb-zone:limit"* ]] && [ $CODE2 -eq 2 ] && [[ "$ERR2" == *"1,000 limit"* ]] && [[ "$ERR2" != *"/no-dumb-zone:limit"* ]] \
+  && ok "33 Cowork, env limit or test-sized 1k file limit: fires, no carry sentence" || fail "33 no carry for env/test-sized" "code=$CODE err=$ERR code2=$CODE2 err2=$ERR2"
+
+# pickup in Cowork: the paste line's "Then /no-dumb-zone:limit 150k." lands in this task's limit file, context says so and still points at the device folder
+D4="$T/data4"; rm -f "$CLAUDE_PROJECT_DIR/NOTES.md"
+OUT=$(echo '{"session_id":"k5","cwd":"'"$CLAUDE_PROJECT_DIR"'","prompt":"inkbook: booking flow (4). Continue from NOTES.md. Then /no-dumb-zone:limit 150k."}' | NDZ_SURFACE=cowork CLAUDE_PLUGIN_DATA="$D4" node "$PLUGIN/scripts/ndz-pickup.js" 2>"$T/err"); CODE=$?; ERR=$(cat "$T/err")
+python3 - "$OUT" "$D4" <<'PY' && ok "34 Cowork pickup with carry line: limit file = 150000, context says applied + device pointer, no title" || fail "34 pickup applies carry" "code=$CODE out=$OUT err=$ERR ls=$(ls $D4 2>&1)"
+import json, sys, pathlib
+d = json.loads(sys.argv[1])["hookSpecificOutput"]
+assert pathlib.Path(sys.argv[2], "limit").read_text().strip() == "150000"
+assert "150,000" in d["additionalContext"] and "no need to run the limit skill" in d["additionalContext"], d
+assert "$HOME/mnt/<folder>/NOTES.md" in d["additionalContext"], d
+assert "sessionTitle" not in d, d
+PY
+
+# the Stop hook in that same task then uses it
+OUT=$(echo '{"session_id":"k5","transcript_path":"'"$BIG"'","stop_hook_active":false}' | NDZ_SURFACE=cowork NDZ_LIMIT= CLAUDE_PLUGIN_DATA="$D4" node "$PLUGIN/scripts/ndz-check.js" 2>"$T/err"); CODE=$?; ERR=$(cat "$T/err")
+[ $CODE -eq 2 ] && [[ "$ERR" == *"150,000 limit"* ]] && [[ "$ERR" == *"Then /no-dumb-zone:limit 150000."* ]] && ok "35 pickup -> Stop hook: 180k over the carried 150k, and it carries again" || fail "35 carried limit used" "code=$CODE err=$ERR"
+
+# a plain first message, or the terminal, writes nothing
+D5="$T/data5"
+OUT=$(echo '{"session_id":"k6","cwd":"'"$CLAUDE_PROJECT_DIR"'","prompt":"inkbook: booking flow (4). Continue from NOTES.md."}' | NDZ_SURFACE=cowork CLAUDE_PLUGIN_DATA="$D5" node "$PLUGIN/scripts/ndz-pickup.js" 2>"$T/err"); CODE=$?
+OUT2=$(echo '{"session_id":"k7","cwd":"'"$CLAUDE_PROJECT_DIR"'","prompt":"x. Then /no-dumb-zone:limit 150k."}' | CLAUDE_PLUGIN_DATA="$D5" node "$PLUGIN/scripts/ndz-pickup.js" 2>"$T/err"); CODE2=$?
+[ $CODE -eq 0 ] && [ $CODE2 -eq 0 ] && [ ! -f "$D5/limit" ] && [[ "$OUT" != *"applied"* ]] && [[ "$OUT2" != *"applied"* ]] \
+  && ok "36 no carry line in Cowork, or carry line in the terminal: no limit file written" || fail "36 no stray writes" "code=$CODE code2=$CODE2 out=$OUT out2=$OUT2 ls=$(ls $D5 2>&1)"
+
+# /no-dumb-zone:limit in Cowork says what happens to the file
+OUT=$(NDZ_SURFACE=cowork node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D5" 150k 2>"$T/err"); CODE=$?
+OUT2=$(NDZ_SURFACE=cowork node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D5" show 2>"$T/err"); CODE2=$?
+OUT3=$(NDZ_SURFACE=cowork node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D5" 1000 2>"$T/err"); CODE3=$?
+[ $CODE -eq 0 ] && [[ "$OUT" == *"carries this limit into the next task"* ]] && [ $CODE2 -eq 0 ] && [[ "$OUT2" == *"carries this limit into the next task"* ]] \
+  && [ $CODE3 -eq 0 ] && [[ "$OUT3" == *"not carried into the next task"* ]] && [[ "$OUT3" == *"test-sized"* ]] \
+  && ok "37 limit set/show in Cowork: says the paste line carries it; 1k says test-sized, not carried" || fail "37 limit cowork wording" "out=$OUT out2=$OUT2 out3=$OUT3"
+OUT=$(node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D5" show 2>"$T/err")
+[[ "$OUT" != *"next task"* ]] && ok "37b limit show in the terminal: no Cowork line" || fail "37b terminal show" "out=$OUT"
+
 echo
 echo "$PASS passed, $FAIL failed"
 rm -rf "$T"

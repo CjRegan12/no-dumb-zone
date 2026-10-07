@@ -27,6 +27,8 @@ The plugin detects which surface it is on (`CLAUDE_CODE_ENTRYPOINT=remote_cowork
 
 So in Cowork the handoff ends with two lines: the confirmation, and a line like `inkbook: booking flow (3). Continue from NOTES.md.` Start a new task in the same folder and paste that line. The chat gets a real name and Claude goes straight to the notes.
 
+That paste line is also how a limit survives in Cowork. The `limit` file lives in the task's container and dies with it, so when the limit came from `/no-dumb-zone:limit`, the handoff line ends with `Then /no-dumb-zone:limit 150000.` and the pickup hook in the next task writes the file from that first message before Claude takes a turn. Test-sized limits (under 10k) are never carried, so a `/no-dumb-zone:limit 1000` test does not re-fire in every task after it.
+
 ## Requirements
 
 - Claude Code v2.1.251 or later
@@ -70,7 +72,7 @@ Use `tar -a`, not `Compress-Archive`: the latter writes backslash entry names th
 | `NDZ_LIMIT` | `env` block in `~/.claude/settings.json` (`%USERPROFILE%\.claude\settings.json` on Windows), or a project's `.claude/settings.json` | `250000` | Tokens. Must be below your auto-compact point or the hook never fires. On a 200k model use ~130000. |
 | `autoCompactEnabled` | same settings file | `true` | Set `false` to let this plugin replace compaction instead of racing it. |
 | `/no-dumb-zone:limit` | a skill; `/no-dumb-zone:limit 100000`, `100k`, `show`, `clear` | | Writes, prints or removes the `limit` file below and tells you which limit the hook will actually use. Works in the terminal and inside a Cowork task. Claude also runs it when you say "lower the handoff limit to 100k". |
-| `limit` file | `$CLAUDE_PLUGIN_DATA/limit` (`~/.claude/plugins/data/no-dumb-zone-synced/limit` for the uploaded plugin, `.../no-dumb-zone-inline/limit` for `--plugin-dir`) | none | One number. Used when `NDZ_LIMIT` is unset. The only way to change the limit from inside a Cowork task, where env vars can't be set. In the terminal it persists across sessions; a Cowork container is thrown away with the task, so there it lasts one task. |
+| `limit` file | `$CLAUDE_PLUGIN_DATA/limit` (`~/.claude/plugins/data/no-dumb-zone-synced/limit` for the uploaded plugin, `.../no-dumb-zone-inline/limit` for `--plugin-dir`) | none | One number. Used when `NDZ_LIMIT` is unset. The only way to change the limit from inside a Cowork task, where env vars can't be set. In the terminal it persists across sessions; a Cowork container is thrown away with the task, so there it lasts one task, and the handoff's paste line carries it into the next (limits under 10k excepted). |
 
 Example settings:
 
@@ -133,7 +135,7 @@ Run a hook by hand with fake input:
 ## Troubleshooting
 
 - **Nothing happens at the limit.** Auto-compact probably fired first. Lower the limit (`/no-dumb-zone:limit 130000`) or set `autoCompactEnabled: false`.
-- **`/no-dumb-zone:limit` wrote the file but the hook still uses the old number.** `NDZ_LIMIT` in the environment wins over the file; `/no-dumb-zone:limit show` says so when that is the case. In Cowork the file is per task, so a limit set in one task does not carry into the next.
+- **`/no-dumb-zone:limit` wrote the file but the hook still uses the old number.** `NDZ_LIMIT` in the environment wins over the file; `/no-dumb-zone:limit show` says so when that is the case. In Cowork the file is per task; it reaches the next task only through the handoff's paste line (`... Then /no-dumb-zone:limit 150000.`), so a task started with a plain first message starts at the default again. Type `/no-dumb-zone:limit 150k` there, or start the task with that line.
 - **`claude plugin list` says `no-dumb-zone@synced` was not loaded.** You also installed it from the marketplace or `--plugin-dir`. Same name, so the terminal loads only the local copy and skips the synced one; Cowork is unaffected and keeps running the synced copy. Pick one for the terminal (`claude plugin uninstall no-dumb-zone@cjregan` to go back to synced).
 - **Cowork task started without the folder connected.** The pickup hook still fires; it tells Claude to request access to the project folder rather than search its workspace. Connecting the folder when you start the task skips that step.
 - **`<hook> hook error` in the transcript.** Run `claude --debug-file ndz.log` and read the log. Usually `node` isn't on PATH for the process that launched Claude, or the transcript layout changed; `ndz-check.js` looks for `message.usage` on `type: assistant` lines.

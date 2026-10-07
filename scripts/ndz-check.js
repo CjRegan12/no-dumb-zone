@@ -22,7 +22,15 @@
  */
 
 const fs = require("fs");
-const { readHookInput, markerPath, pruneOldMarkers, emit, isCowork, resolveLimit } = require("./ndz-common");
+const {
+  readHookInput,
+  markerPath,
+  pruneOldMarkers,
+  emit,
+  isCowork,
+  resolveLimit,
+  TEST_SIZED_BELOW,
+} = require("./ndz-common");
 
 const TAIL_BYTES = 512 * 1024; // read this much from the end of the transcript first
 
@@ -88,7 +96,7 @@ function main() {
   // Stay out of subagents and out of the handoff turn itself.
   if (inp.agent_id || inp.stop_hook_active) return 0;
 
-  const { limit } = resolveLimit();
+  const { limit, source } = resolveLimit();
 
   pruneOldMarkers();
 
@@ -111,13 +119,25 @@ function main() {
   }
 
   fs.writeFileSync(marker, String(ctx));
+
+  // A limit set inside a Cowork task lives in this container and dies with it.
+  // The handoff's paste line is the only thing that reaches the next task, so
+  // it carries the limit; ndz-pickup.js applies it there. Test-sized limits
+  // stay behind, or the test would re-fire in every task that follows.
+  const carry =
+    cowork && source === "file" && limit >= TEST_SIZED_BELOW
+      ? ` Limit carry-over: this task's limit was set with /no-dumb-zone:limit, so end the ` +
+        `second line of the handoff with " Then /no-dumb-zone:limit ${limit}." and the next task keeps it.`
+      : "";
+
   process.stderr.write(
     `NO DUMB ZONE: context is ${fmt(ctx)} tokens, over the ${fmt(limit)} limit. ` +
       "Do not start anything new. Run the /no-dumb-zone:handoff skill now, " +
       "follow it exactly, then stop. " +
       (cowork
         ? "Surface: Cowork. The project folder is a connected folder on the user's computer, " +
-          "not in this workspace: write NOTES.md and CLAUDE.md there and commit there."
+          "not in this workspace: write NOTES.md and CLAUDE.md there and commit there." +
+          carry
         : "Surface: terminal.") +
       "\n"
   );

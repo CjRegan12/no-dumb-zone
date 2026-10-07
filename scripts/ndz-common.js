@@ -87,6 +87,35 @@ function resolveLimit(dir) {
   return { limit: DEFAULT_LIMIT, source: "default" };
 }
 
+/** Limits below this are test-sized: they fire the handoff at the very next
+ *  stop. The Cowork carry-over below never forwards one, or a test would
+ *  re-fire in every task that follows. */
+const TEST_SIZED_BELOW = 10000;
+
+/** "100000" | "100k" | "0.5m" | "250,000" -> integer tokens, or 0 if not a limit. */
+function parseTokens(s) {
+  const m = /^(\d+(?:\.\d+)?)\s*([kKmM])?$/.exec(String(s || "").replace(/[,_]/g, "").trim());
+  if (!m) return 0;
+  const mult = { k: 1e3, m: 1e6 }[(m[2] || "").toLowerCase()] || 1;
+  const n = Math.round(parseFloat(m[1]) * mult);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/** Cowork carry-over. The limit file dies with the task's container, so the
+ *  handoff's paste line ends with "Then /no-dumb-zone:limit <n>." and the
+ *  pickup hook applies it from the first prompt of the next task. This is the
+ *  reader side: the token count after /no-dumb-zone:limit in a prompt, or 0.
+ *  Trailing punctuation from the sentence is ignored; "show" and "clear" are not limits. */
+function limitFromPrompt(text) {
+  const m = /\/no-dumb-zone:limit\s+(\S+)/.exec(String(text || ""));
+  return m ? parseTokens(m[1].replace(/[.,;:!?)\]]+$/, "")) : 0;
+}
+
+function writeLimitFile(dir, tokens) {
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(limitFilePath(dir), String(tokens) + "\n");
+}
+
 /** Print one JSON object to stdout. Stdout must contain nothing else. */
 function emit(obj) {
   process.stdout.write(JSON.stringify(obj));
@@ -120,4 +149,8 @@ module.exports = {
   limitFilePath,
   limitFromFile,
   resolveLimit,
+  TEST_SIZED_BELOW,
+  parseTokens,
+  limitFromPrompt,
+  writeLimitFile,
 };

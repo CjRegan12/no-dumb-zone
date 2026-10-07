@@ -25,20 +25,14 @@ const {
   limitFromFile,
   resolveLimit,
   DEFAULT_LIMIT,
+  TEST_SIZED_BELOW,
+  parseTokens,
+  writeLimitFile,
 } = require("./ndz-common");
 
 const USAGE = "usage: node ndz-limit.js [--data-dir DIR] [show | clear | <tokens>]  (tokens: 100000, 100k, 0.5m)";
 
 const fmt = (n) => n.toLocaleString("en-US");
-
-/** "100000" | "100k" | "0.5m" | "250,000" -> integer tokens, or 0 if not a limit. */
-function parseTokens(s) {
-  const m = /^(\d+(?:\.\d+)?)\s*([kKmM])?$/.exec(String(s || "").replace(/[,_]/g, "").trim());
-  if (!m) return 0;
-  const mult = { k: 1e3, m: 1e6 }[(m[2] || "").toLowerCase()] || 1;
-  const n = Math.round(parseFloat(m[1]) * mult);
-  return Number.isFinite(n) && n > 0 ? n : 0;
-}
 
 function parseArgs(argv) {
   const out = { dir: "", cmd: "show", raw: "" };
@@ -66,9 +60,16 @@ function parseArgs(argv) {
   return out;
 }
 
-function whereItLands() {
+/** Cowork only: what happens to a file limit when the task ends. */
+function coworkFate(tokens) {
+  return tokens >= TEST_SIZED_BELOW
+    ? "the handoff's paste line carries this limit into the next task."
+    : "a test-sized limit is not carried into the next task.";
+}
+
+function whereItLands(tokens) {
   return isCowork()
-    ? "This is a Cowork task: the file lives in the task's container and is gone when the task ends."
+    ? `This is a Cowork task: the file dies with it, but ${coworkFate(tokens)}`
     : "Persists for every session on this machine.";
 }
 
@@ -83,6 +84,9 @@ function describe(dir) {
     `  limit file: ${file} (${fileVal ? fmt(fileVal) : fs.existsSync(file) ? "present but not a number" : "absent"})`,
     `  NDZ_LIMIT: ${env ? fmt(env) + ", takes precedence over the file" : "unset"}`,
   ];
+  if (isCowork() && source === "file") {
+    lines.push(`  Cowork task: the file dies with it, but ${coworkFate(limit)}`);
+  }
   return lines.join("\n");
 }
 
@@ -121,14 +125,13 @@ function main(argv) {
     return 1;
   }
   const before = resolveLimit(dir);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(file, String(tokens) + "\n");
+  writeLimitFile(dir, tokens);
   const env = positiveInt(process.env.NDZ_LIMIT);
 
   const out = [
     `no-dumb-zone limit set to ${fmt(tokens)} tokens (was ${fmt(before.limit)}, ${before.source === "default" ? "the default" : "from " + (before.source === "env" ? "NDZ_LIMIT" : "the limit file")}).`,
     `  file: ${file}`,
-    `  ${whereItLands()} Takes effect the next time Claude stops.`,
+    `  ${whereItLands(tokens)} Takes effect the next time Claude stops.`,
   ];
   if (env) {
     out.push(
