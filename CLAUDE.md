@@ -31,4 +31,5 @@ Claude Code plugin: Stop hook forces a handoff past a token limit, PermissionReq
 - The Cowork workspace on Windows is an Ubuntu 22.04 VM (node 22, python3, jq, git). Hooks run there as on Linux.
 - Committing from the Cowork VM into a mounted Windows folder leaves `.git/*.lock` and `objects/*/tmp_obj_*` behind unless deletion is enabled for the folder (ask with `device_request_delete_permission`, then `find .git \( -name '*.lock' -o -name 'tmp_obj_*' \) -type f -delete`); remove them or the next git command fails.
 - Debug a hook: `claude --debug-file ndz.log`, then grep the log for the hook name.
+- Uploading a new zip re-syncs into running Cowork tasks as a sibling dir with a generation suffix (`no-dumb-zone~g2`); hooks and skills from the new version start firing in the live task, so a running task is not a clean test of the old version after an upload. `${CLAUDE_PLUGIN_ROOT}` follows the suffix; never hardcode the synced path.
 - In Cowork, a Stop hook exit 2 arrives as a `Stop hook feedback:` user turn carrying the stderr text, in the same task; the Skill call for the handoff then runs without a permission prompt (PermissionRequest hook). Verified live.
