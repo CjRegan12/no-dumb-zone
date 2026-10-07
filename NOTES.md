@@ -8,6 +8,7 @@
 - Tests 25 to 30 added, 32 pass in the Cowork VM. `claude plugin validate` passes (run in the Cowork container on a staged copy).
 - Live-tested the skill headlessly from the container: `claude -p "/no-dumb-zone:limit 42k" --plugin-dir <staged copy>` wrote `~/.claude/plugins/data/no-dumb-zone-inline/limit`, `show` and `clear` behaved. So `${CLAUDE_PLUGIN_DATA}` substitution in skill bodies is confirmed, and `--plugin-dir` installs resolve to `no-dumb-zone-inline`.
 - README (Configure rows, Files, Cowork test recipe, troubleshooting), CLAUDE.md (test count, validate/headless recipe, limit conventions, data-dir ids) updated. Version 0.2.2, committed as `bff9d41`. `dist/no-dumb-zone-plugin.zip` rebuilt at 0.2.2 (12 entries, forward slashes). Not yet uploaded.
+- Later in the same session: user renamed `master` to `main` and pushed; repo is https://github.com/CjRegan12/no-dumb-zone. Added `.claude-plugin/marketplace.json` (marketplace `cjregan`, source `.`), `homepage`/`repository` in plugin.json, GitHub install route in README, personal paths scrubbed from README. Validated and test-installed from the marketplace inside the Cowork container (`claude plugin install no-dumb-zone@cjregan`), then uninstalled. Found that a same-named local install makes the terminal skip `@synced`; documented in README and CLAUDE.md. Commit `4f61c6d`. Zip rebuilt again (plugin.json only from `.claude-plugin/`, 12 entries, 0.2.2).
 - Checked and ruled out from inside a task: the container's `gh` has no valid token and the Cowork VM has no `gh`, so GitHub push is a PowerShell job. `C:\Users\regan\.claude\` is a protected folder the device tools cannot open, so the global CLAUDE.md edit is also the user's.
 
 ## Decisions and why
@@ -18,7 +19,7 @@
 ## Next steps
 1. User, in the desktop app: upload `dist\no-dumb-zone-plugin.zip` (0.2.2) under Customize > Plugins, replacing no-dumb-zone 0.2.0. Until then every new task runs 0.2.0, which has neither the limit file nor the limit skill.
 2. First turn of the next Cowork task after the upload: run `/no-dumb-zone:limit show`. Expected path in the output: `~/.claude/plugins/data/no-dumb-zone-synced/limit`. That confirms the skill under the synced install; note it here and the v0.2 workstream is done.
-3. User, in PowerShell from the repo root: `git branch -m master main; gh repo create no-dumb-zone --public --source . --push`. Then optionally `.claude-plugin/marketplace.json` and a README install line for `claude plugin marketplace add`.
+3. User, in PowerShell: `git push` (commit `4f61c6d` is local only). Optional: add a LICENSE file (none yet; the repo is public) and set `license` in plugin.json to match.
 4. User: move the GateGuard gotcha line from the per-project `CLAUDE.md` files (InkBook, agency) into `C:\Users\regan\.claude\CLAUDE.md`. The line is not in this repo; look in those repos.
 5. Carry over from v0.1: use the plugin on InkBook for a day, then decide nag frequency (every stop vs every third), auto-commit vs stage-only, and whether project repos commit `NOTES.md` or gitignore it.
 
