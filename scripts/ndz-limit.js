@@ -2,10 +2,14 @@
 /**
  * no-dumb-zone limit tool. Behind the /no-dumb-zone:limit skill; also fine by hand.
  *
- *   node ndz-limit.js [--data-dir DIR] [show | clear | <tokens>]
+ *   node ndz-limit.js [--data-dir DIR] [--session ID] [--transcript FILE] [show | clear | <tokens>]
  *
  *   <tokens>   write DIR/limit. Accepts 100000, 100k, 0.5m, 250,000.
- *   show       print the limit the Stop hook will use and where it comes from. Default.
+ *   show       print the limit the Stop hook will use and where it comes from, and
+ *              the session's current context against it. Default.
+ *   --session / --transcript   which session "show" measures: a transcript file,
+ *              or the session id to look one up by; neither, the transcript written
+ *              to most recently. The skill passes ${CLAUDE_SESSION_ID}.
  *   clear      delete DIR/limit; the hook goes back to NDZ_LIMIT or the default.
  *
  * The Stop hook reads NDZ_LIMIT, then DIR/limit, then the surface default (500000 terminal, 600000 Cowork). Hooks get DIR from
@@ -27,16 +31,18 @@ const {
   defaultLimit,
   TEST_SIZED_BELOW,
   parseTokens,
+  contextTokens,
+  findTranscript,
   writeLimitFile,
 } = require("./ndz-common");
 
-const USAGE = "usage: node ndz-limit.js [--data-dir DIR] [show | clear | <tokens>]  (tokens: 100000, 100k, 0.5m)";
+const USAGE = "usage: node ndz-limit.js [--data-dir DIR] [--session ID] [--transcript FILE] [show | clear | <tokens>]  (tokens: 100000, 100k, 0.5m)";
 
 const fmt = (n) => n.toLocaleString("en-US");
 const DEFAULT_WORD = isCowork() ? "the Cowork default" : "the terminal default";
 
 function parseArgs(argv) {
-  const out = { dir: "", cmd: "show", raw: "" };
+  const out = { dir: "", cmd: "show", raw: "", session: "", transcript: "" };
   const rest = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -44,6 +50,10 @@ function parseArgs(argv) {
       out.dir = argv[++i] || "";
     } else if (a.startsWith("--data-dir=")) {
       out.dir = a.slice("--data-dir=".length);
+    } else if (a === "--session") {
+      out.session = argv[++i] || "";
+    } else if (a === "--transcript") {
+      out.transcript = argv[++i] || "";
     } else if (a.trim()) {
       rest.push(a.trim());
     }
@@ -58,6 +68,8 @@ function parseArgs(argv) {
   }
   // An unsubstituted or empty --data-dir means "wherever the hooks look by default".
   if (!out.dir || out.dir.includes("${")) out.dir = dataDir();
+  // Same for a session id the skill could not substitute.
+  if (out.session.includes("${")) out.session = "";
   return out;
 }
 
@@ -74,7 +86,7 @@ function whereItLands(tokens) {
     : "Persists for every session on this machine.";
 }
 
-function describe(dir) {
+function describe(dir, args) {
   const { limit, source } = resolveLimit(dir);
   const file = limitFilePath(dir);
   const fileVal = limitFromFile(dir);
@@ -88,6 +100,13 @@ function describe(dir) {
   if (isCowork() && source === "file") {
     lines.push(`  Cowork task: the file dies with it, but ${coworkFate(limit)}`);
   }
+  // Same reading the Stop hook takes: the last response's input tokens.
+  const ctx = contextTokens(args.transcript || findTranscript(args.session));
+  lines.push(
+    ctx
+      ? `  context now: ${fmt(ctx)} tokens, ${Math.round((ctx / limit) * 100)}% of the limit`
+      : "  context now: not measured (no transcript with a response in it yet)"
+  );
   return lines.join("\n");
 }
 
@@ -101,7 +120,7 @@ function main(argv) {
   const file = limitFilePath(dir);
 
   if (cmd === "show") {
-    process.stdout.write(describe(dir) + "\n");
+    process.stdout.write(describe(dir, args) + "\n");
     return 0;
   }
 

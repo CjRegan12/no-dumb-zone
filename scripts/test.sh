@@ -335,6 +335,20 @@ R=$(tail -1 "$T/crlf.out")
 [[ "$R" == "|crlf.txt lf.txt |0|3" ]] && ok "43 git -c core.autocrlf=input add -A: phantom not staged; real edits staged, LF file stays LF, CRLF file stays CRLF" || fail "43 autocrlf staging" "got=$R"
 grep -q 'git -c core.autocrlf=input add -A' "$PLUGIN/skills/handoff/SKILL.md" && ok "43b handoff skill stages the Cowork commit with that command" || fail "43b skill text" "command missing from skills/handoff/SKILL.md"
 
+echo "== limit show: context now (0.4.1) =="
+D10="$T/data10"; mkdir -p "$D10"
+OUT=$(node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D10" --transcript "$BIG" show 2>"$T/err"); CODE=$?
+[ $CODE -eq 0 ] && [[ "$OUT" == *"context now: 180,000 tokens, 36% of the limit"* ]] && ok "50 show --transcript: context against the 500k default" || fail "50 show context" "code=$CODE out=$OUT"
+CFG="$T/cfg"; mkdir -p "$CFG/projects/-a" "$CFG/projects/-b"
+cp "$SMALL" "$CFG/projects/-a/sess-old.jsonl"; cp "$BIG" "$CFG/projects/-b/sess-new.jsonl"; touch -d '2020-01-01' "$CFG/projects/-a/sess-old.jsonl"
+OUT=$(CLAUDE_CONFIG_DIR="$CFG" node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D10" --session sess-old show 2>"$T/err")
+[[ "$OUT" == *"context now: 6,000 tokens, 1% of the limit"* ]] && ok "51 show --session: finds that session's transcript" || fail "51 show --session" "out=$OUT"
+OUT=$(CLAUDE_CONFIG_DIR="$CFG" node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D10" --session '${CLAUDE_SESSION_ID}' show 2>"$T/err")
+[[ "$OUT" == *"context now: 180,000 tokens"* ]] && ok "52 unsubstituted session id: falls back to the newest transcript" || fail "52 newest transcript" "out=$OUT"
+OUT=$(CLAUDE_CONFIG_DIR="$T/nope" node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D10" show 2>"$T/err"); CODE=$?
+[ $CODE -eq 0 ] && [[ "$OUT" == *"context now: not measured"* ]] && ok "53 no transcript: says not measured, exit 0" || fail "53 no transcript" "code=$CODE out=$OUT"
+grep -q -- '--session "${CLAUDE_SESSION_ID}"' "$PLUGIN/skills/limit/SKILL.md" && ok "54 limit skill passes the session id" || fail "54 skill text" "--session missing from skills/limit/SKILL.md"
+
 echo
 echo "$PASS passed, $FAIL failed"
 rm -rf "$T"

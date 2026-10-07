@@ -162,6 +162,103 @@ function limitFromTranscript(transcriptPath) {
   return 0;
 }
 
+const TAIL_BYTES = 512 * 1024; // read this much from the end of the transcript first
+
+/** Context size = total input tokens of the most recent assistant message.
+ *  Each assistant line carries message.usage with input_tokens,
+ *  cache_read_input_tokens and cache_creation_input_tokens. Their sum is what
+ *  the model saw on that request, i.e. the live context. Transcripts get big,
+ *  so read the tail first and only fall back to a full scan if needed. */
+function contextTokens(transcriptPath) {
+  if (!transcriptPath || !fs.existsSync(transcriptPath)) return 0;
+  let size;
+  try {
+    size = fs.statSync(transcriptPath).size;
+  } catch {
+    return 0;
+  }
+
+  let tail;
+  if (size > TAIL_BYTES) {
+    const fd = fs.openSync(transcriptPath, "r");
+    try {
+      const buf = Buffer.alloc(TAIL_BYTES);
+      fs.readSync(fd, buf, 0, TAIL_BYTES, size - TAIL_BYTES);
+      tail = buf.toString("utf8");
+      tail = tail.slice(tail.indexOf("\n") + 1); // drop the partial line we landed in
+    } finally {
+      fs.closeSync(fd);
+    }
+  } else {
+    tail = fs.readFileSync(transcriptPath, "utf8");
+  }
+
+  const fromTail = lastUsage(tail.split("\n"));
+  if (fromTail || size <= TAIL_BYTES) return fromTail;
+  return lastUsage(fs.readFileSync(transcriptPath, "utf8").split("\n"));
+}
+
+function lastUsage(lines) {
+  let last = 0;
+  for (let line of lines) {
+    line = line.trim();
+    if (!line || !line.includes('"usage"')) continue;
+    let rec;
+    try {
+      rec = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (rec.type !== "assistant") continue;
+    const u = (rec.message && rec.message.usage) || {};
+    const total =
+      (u.input_tokens || 0) +
+      (u.cache_read_input_tokens || 0) +
+      (u.cache_creation_input_tokens || 0);
+    if (total) last = total;
+  }
+  return last;
+}
+
+/** The transcript of the session a skill is running in, for scripts that are
+ *  not hooks and so get no transcript_path. By session id when the skill could
+ *  pass one (<config dir>/projects/<cwd slug>/<id>.jsonl), else the transcript
+ *  written to most recently, which is the live session's. "" when none. */
+function findTranscript(sessionId) {
+  const root = path.join(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"), "projects");
+  let dirs = [];
+  try {
+    dirs = fs.readdirSync(root);
+  } catch {
+    return "";
+  }
+  let newest = "";
+  let newestAt = 0;
+  for (const d of dirs) {
+    let names = [];
+    try {
+      names = fs.readdirSync(path.join(root, d));
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      if (!name.endsWith(".jsonl")) continue;
+      const p = path.join(root, d, name);
+      if (sessionId && name === sessionId + ".jsonl") return p;
+      try {
+        const at = fs.statSync(p).mtimeMs;
+        if (at > newestAt) {
+          newestAt = at;
+          newest = p;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  return newest;
+}
+
 function writeLimitFile(dir, tokens) {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(limitFilePath(dir), String(tokens) + "\n");
@@ -206,5 +303,7 @@ module.exports = {
   parseTokens,
   limitFromPrompt,
   limitFromTranscript,
+  contextTokens,
+  findTranscript,
   writeLimitFile,
 };
