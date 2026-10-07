@@ -1,0 +1,43 @@
+{
+  "description": "no-dumb-zone: force a handoff when context passes NDZ_LIMIT, and brief + name the next session from NOTES.md",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/ndz-check.js"],
+            "timeout": 20,
+            "statusMessage": "no-dumb-zone: checking context size"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/ndz-allow-handoff.js"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/ndz-pickup.js"],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
