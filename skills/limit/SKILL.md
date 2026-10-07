@@ -19,6 +19,7 @@ What the argument means:
 
 Rules:
 
+- Check the command before you run it. The three quoted values after `node`, `--data-dir` and `--session` must be real: two absolute paths and a session id. If any of them still reads as a dollar sign and braces around a name in capitals, you are looking at the raw skill file and the shell would expand it to nothing (`Cannot find module '/scripts/ndz-limit.js'`). Do not run it and do not fill the values in by hand: launch this skill again through the Skill tool (`no-dumb-zone:limit`, same argument), which fills them in, and run the command it gives you.
 - Use the Bash tool (the workspace shell), never the device shell. The hooks run where this command runs; a file written on the user's computer is never read.
 - Do not write or edit the `limit` file by hand and do not guess its path. The command above already carries the right directory.
 - If the command exits non-zero, show the user its stderr and stop.

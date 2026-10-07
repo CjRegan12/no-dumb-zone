@@ -348,6 +348,7 @@ OUT=$(CLAUDE_CONFIG_DIR="$CFG" node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$
 OUT=$(CLAUDE_CONFIG_DIR="$T/nope" node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D10" show 2>"$T/err"); CODE=$?
 [ $CODE -eq 0 ] && [[ "$OUT" == *"context now: not measured"* ]] && ok "53 no transcript: says not measured, exit 0" || fail "53 no transcript" "code=$CODE out=$OUT"
 grep -q -- '--session "${CLAUDE_SESSION_ID}"' "$PLUGIN/skills/limit/SKILL.md" && ok "54 limit skill passes the session id" || fail "54 skill text" "--session missing from skills/limit/SKILL.md"
+grep -q 'launch this skill again through the Skill tool' "$PLUGIN/skills/limit/SKILL.md" && ok "55 limit skill guards against unfilled placeholders" || fail "55 skill guard" "guard rule missing from skills/limit/SKILL.md"
 
 echo
 echo "$PASS passed, $FAIL failed"

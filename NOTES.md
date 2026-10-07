@@ -21,7 +21,7 @@
 
 ## Next steps
 1. Use the plugin on InkBook for a day, then decide nag frequency, auto-commit vs stage-only, and whether project repos commit `NOTES.md` or gitignore it.
-2. 0.4.1 is committed (2026-10-07). 0.4.0 added the mod (`hooks/register.ts`: meter above the prompt, `Handoff now`, `/ndz`, `/clear` prefill); CJ ran it live in a terminal on 2.1.293 and it worked. Cowork does not load the mod (`/ndz` was not a command in a fresh task on the uploaded 0.4.0), so 0.4.1 adds `context now: ...` to `/no-dumb-zone:limit show` as the Cowork meter. Left to do: push, upload `dist/no-dumb-zone-plugin.zip`, then in a fresh Cowork task run `/no-dumb-zone:limit show` and check the `context now` line is there and plausible.
+2. 0.4.2 is committed (2026-10-07; it adds a guard to the limit skill for unfilled placeholders, see CLAUDE.md gotchas). 0.4.1 was pushed and uploaded, and `/no-dumb-zone:limit show` printed a correct `context now` in a Cowork task when launched through the Skill tool. 0.4.0 added the mod (`hooks/register.ts`: meter above the prompt, `Handoff now`, `/ndz`, `/clear` prefill); CJ ran it live in a terminal on 2.1.293 and it worked. Cowork does not load the mod (`/ndz` was not a command in a fresh task on the uploaded 0.4.0), so 0.4.1 adds `context now: ...` to `/no-dumb-zone:limit show` as the Cowork meter. Left to do: push 0.4.2, upload `dist/no-dumb-zone-plugin.zip`.
 
 ## Open questions for the user
 - After a week at 600k in Cowork: any sign of the dumb zone (wrong file edits, forgotten constraints, repeated mistakes late in a task)? If yes, the data says 400k; `/no-dumb-zone:limit 400k` carries from task to task without a re-upload.
