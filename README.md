@@ -29,14 +29,16 @@ claude --plugin-dir C:\Users\regan\source\repos\no-dumb-zone
 
 macOS or Linux: same flag, your path.
 
-**Install for every terminal session** from the local folder:
+**Install everywhere at once (Cowork + terminal):** zip the folder contents and upload under Customize > Plugins > Add > Upload plugin in the desktop app:
 
 ```powershell
-claude plugin marketplace add C:\Users\regan\source\repos\no-dumb-zone
-claude plugin install no-dumb-zone
+Get-ChildItem C:\Users\regan\source\repos\no-dumb-zone -Exclude .git |
+  Compress-Archive -DestinationPath C:\Users\regan\Downloads\no-dumb-zone.zip -Force
 ```
 
-**Cowork (desktop app):** zip the folder (`Compress-Archive -Path .\no-dumb-zone -DestinationPath .\no-dumb-zone.zip`) and upload it under Customize > Plugins > Add > Upload plugin. Hooks and skills both load in Cowork. The same install also reaches your terminal sessions as `no-dumb-zone@synced`, so once it's on your account you don't need the local install too.
+Hooks and skills both load in Cowork, and the same install reaches your terminal sessions as `no-dumb-zone@synced` at the next session start. After changing the plugin, re-zip and re-upload.
+
+**Terminal only, without the account:** keep using `--plugin-dir`, or set it once per shell with `$env:CLAUDE_CODE_PLUGIN_DIRS = "C:\Users\regan\source\repos\no-dumb-zone"`.
 
 ## Configure
 
