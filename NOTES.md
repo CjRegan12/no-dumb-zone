@@ -1,40 +1,38 @@
-# no-dumb-zone: v0.2.0 Cowork mode (2)
+# no-dumb-zone: v0.2 Cowork mode (3)
 
 ## Done this session
-- Diagnosed why new Cowork chats went hunting for context: Cowork tasks run the hooks in a cloud container (cwd `/home/claude`); the project folder is on CJ's PC and only reachable through device tools, so the pickup hook could never see `NOTES.md`, and the handoff wrote into the wrong place unless Claude happened to use the device shell. Separate issue: Cowork names chats from the first message and ignores `sessionTitle`.
-- Found the surface signal: `CLAUDE_CODE_ENTRYPOINT=remote_cowork` is set inside Cowork tasks (read from a live one). Added `isCowork()` to `ndz-common.js` with an `NDZ_SURFACE` override.
-- `ndz-check.js`: exit-2 instruction now says `Surface: Cowork|terminal`; in Cowork it tells Claude the project is a connected folder on the user's computer. Post-handoff nag says "new task" in Cowork, "/clear" in the terminal.
-- `ndz-pickup.js`: in Cowork with no local `NOTES.md`, injects context telling Claude to read `$HOME/mnt/<folder>/NOTES.md` from the device; no `sessionTitle`.
-- `SKILL.md`: new step 0 (find the project root per surface), Cowork git notes (inline identity, lock files), and a two-line Cowork ending that hands the user a paste-ready first message so Cowork names the chat.
-- Tests 17 to 21 added; 22 pass in the Cowork VM. README gained a Terminal vs Cowork table and the `tar -a` packaging command (Compress-Archive removed). Version 0.2.0. `dist/` gitignored.
-- Committed as `7056669`, git lock files cleaned (needed delete permission on the folder), and `dist/no-dumb-zone-plugin.zip` built (10 entries, forward-slash paths). Not yet uploaded.
-- The 0.1.0 synced Stop hook fired in this very chat at 291k tokens and said `/clear`; this handoff was written by hand to the connected folder, which is exactly what 0.2.0 automates.
+- Step 1 confirmed: this task ran the 0.2.0 synced plugin (checked the container copy under `~/.claude/plugins/synced/`).
+- Step 2 passed: the Cowork pickup context fired on the first message and Claude read `NOTES.md` from the device before doing anything else. Wrinkle: the task started with no folder connected, so Claude had to request access to the repo folder first (path came from project memory).
+- Fixed the wrinkle: `ndz-pickup.js` Cowork pointer now tells Claude to request the project folder (or ask the user) rather than search the workspace.
+- Added the `limit` file: `NDZ_LIMIT` env > `$CLAUDE_PLUGIN_DATA/limit` > 250000. Cowork tasks cannot set env vars, so this is the only in-task knob. `pruneOldMarkers` now touches only `handoff-*`/`pickup-*` so the file survives.
+- Tests: 19 tightened, 22 to 24 added, 25 pass in the Cowork VM. README (Configure table row, Cowork test recipe, troubleshooting entry) and CLAUDE.md updated. Version 0.2.1. Committed as `f66d3ad`, lock files cleaned (delete permission granted for the folder).
+- Rebuilt `dist/no-dumb-zone-plugin.zip` at 0.2.1 (10 entries, forward slashes) with python zipfile from the VM. Not yet uploaded.
+- Step 3 ran live in this task: copied the new scripts over the container's synced copy, wrote `limit` = 1000, ended the turn. The Stop hook fired at 184k tokens with `Surface: Cowork`, the handoff skill ran without a permission prompt, and this file is its output. If you are reading this from a new task, the pickup half worked too.
 
 ## Decisions and why
-- Branch on `CLAUDE_CODE_ENTRYPOINT`, not `CLAUDE_CODE_REMOTE`: the latter is also true for Claude Code on the web, where the repo is on disk and the terminal path is right.
-- Pickup in Cowork injects a pointer rather than trying an `mcp_tool` hook against `device_bash`: an mcp_tool hook cannot check the once-per-session marker and would re-fetch the notes on every prompt.
-- Keep the pasted-first-line workaround for naming rather than fighting Cowork's auto-title: there is no hook path to it.
+- Limit override is a file in `$CLAUDE_PLUGIN_DATA`, not a project file: hooks in Cowork cannot read the project folder, and the data dir is the one place both hooks and Claude's workspace shell can reach.
+- Shipped the pickup fix and the limit file as 0.2.1 instead of folding them into 0.2.0: the user re-uploads anyway, and the commit history shows what the live test changed.
+- Committed the 0.2.1 code before forcing the handoff so the handoff commit holds only NOTES.md and CLAUDE.md.
 
 ## Next steps
-1. Upload `dist/no-dumb-zone-plugin.zip` under Customize > Plugins (replace the existing no-dumb-zone). Running sessions keep 0.1.x; new tasks get 0.2.0. Until then every Cowork chat still loads 0.1.0 and its `/clear` wording.
-2. Live test in Cowork: new task in this folder, first message `no-dumb-zone: v0.2.0 Cowork mode (2). Continue from NOTES.md.` Expect Claude to read this file from `$HOME/mnt/no-dumb-zone/NOTES.md` on its first turn and answer "what's next" from it without searching.
-3. Then force a Cowork handoff with a low limit (`NDZ_LIMIT` can't be set from inside Cowork, so either run a long task or temporarily lower `DEFAULT_LIMIT` in `ndz-check.js` for the test build) and confirm the skill writes `NOTES.md` into the connected folder and ends with the two-line Cowork message.
-4. Carry over from v0.1: use it on InkBook for a day, decide nag frequency (every stop vs every third), decide auto-commit vs stage-only, decide whether project repos commit `NOTES.md` or gitignore it.
-5. Move the GateGuard gotcha into `C:\Users\regan\.claude\CLAUDE.md`.
-6. Rename `master` to `main`, push to GitHub (`gh repo create no-dumb-zone --public --source . --push`), optional `marketplace.json`.
+1. Upload `dist/no-dumb-zone-plugin.zip` (0.2.1) under Customize > Plugins, replacing no-dumb-zone 0.2.0. Until then new tasks run 0.2.0, which lacks the `limit` file and the unconnected-folder sentence.
+2. Confirm this task's own pickup: if this file was read from `$HOME/mnt/no-dumb-zone/NOTES.md` on the first turn without searching, step 3 is fully closed. Note the result in the next NOTES.md and move on.
+3. Carry over from v0.1: use it on InkBook for a day, then decide nag frequency (every stop vs every third), auto-commit vs stage-only, and whether project repos commit `NOTES.md` or gitignore it.
+4. Move the GateGuard gotcha into `C:\Users\regan\.claude\CLAUDE.md`.
+5. Rename `master` to `main`, push to GitHub (`gh repo create no-dumb-zone --public --source . --push`), optional `marketplace.json`.
 
 ## Open questions for the user
-- Should the Cowork pickup context fire in every Cowork task (current), or stay quiet unless the first message mentions NOTES.md? Every task is one short paragraph once; quiet would miss the case where the user forgets to paste the line.
+- Should the Cowork pickup context fire in every Cowork task (current), or stay quiet unless the first message mentions NOTES.md?
 - Nag frequency, auto-commit vs stage, commit-or-ignore `NOTES.md`: still open from v0.1.
+- Should the `limit` file get a skill (`/no-dumb-zone:limit 100000`) so the user does not have to spell out the shell command in Cowork?
 
 ## Files touched
-- scripts/ndz-common.js: `isCowork()` + export
-- scripts/ndz-check.js: surface in exit-2 text, surface-specific nag
-- scripts/ndz-pickup.js: Cowork branch with device-folder pointer
-- scripts/test.sh: `NDZ_SURFACE=terminal` pinned, cases 17 to 21, headers renamed to .js
-- skills/handoff/SKILL.md: step 0, Cowork git notes, two-line Cowork ending, device_bash in allowed-tools
-- README.md: Terminal vs Cowork section, tar packaging, troubleshooting entry, scope notes
-- CLAUDE.md: test count, packaging path, surface detection + Cowork shape facts, lock-file cleanup command
-- .claude-plugin/plugin.json: 0.2.0
-- .gitignore: dist/
+- scripts/ndz-check.js: `resolveLimit()` with the data-dir `limit` file
+- scripts/ndz-common.js: prune only marker files
+- scripts/ndz-pickup.js: unconnected-folder sentence in the Cowork pointer
+- scripts/test.sh: case 19 tightened, 22 to 24 added
+- README.md: limit file row, Cowork test recipe, troubleshooting entry
+- CLAUDE.md: limit order, Cowork live-test recipe, VM packaging, Stop hook feedback shape
+- .claude-plugin/plugin.json: 0.2.1
+- dist/no-dumb-zone-plugin.zip: rebuilt (gitignored)
 - NOTES.md: this file
