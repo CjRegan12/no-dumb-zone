@@ -14,18 +14,16 @@
  *
  * Limit, first one that parses wins:
  *   NDZ_LIMIT                   env var. Terminal only; Cowork tasks cannot set env.
- *   $CLAUDE_PLUGIN_DATA/limit   a file holding one number. Writable from inside
- *                               any session, which is how a Cowork task lowers
- *                               its own limit (for testing, or to hand off early).
+ *   $CLAUDE_PLUGIN_DATA/limit   a file holding one number, written by the
+ *                               /no-dumb-zone:limit skill (ndz-limit.js). The
+ *                               only knob a Cowork task can turn on itself.
  *   250000                      default. Set your limit below the auto-compact
  *                               point or this never runs.
  */
 
 const fs = require("fs");
-const path = require("path");
-const { readHookInput, dataDir, markerPath, pruneOldMarkers, emit, isCowork } = require("./ndz-common");
+const { readHookInput, markerPath, pruneOldMarkers, emit, isCowork, resolveLimit } = require("./ndz-common");
 
-const DEFAULT_LIMIT = 250000;
 const TAIL_BYTES = 512 * 1024; // read this much from the end of the transcript first
 
 /** Context size = total input tokens of the most recent assistant message.
@@ -84,32 +82,13 @@ function lastUsage(lines) {
   return last;
 }
 
-const LIMIT_FILE = "limit";
-
-function positiveInt(s) {
-  const n = parseInt(String(s || "").trim(), 10);
-  return Number.isFinite(n) && n > 0 ? n : 0;
-}
-
-function limitFromFile() {
-  try {
-    return positiveInt(fs.readFileSync(path.join(dataDir(), LIMIT_FILE), "utf8"));
-  } catch {
-    return 0;
-  }
-}
-
-function resolveLimit() {
-  return positiveInt(process.env.NDZ_LIMIT) || limitFromFile() || DEFAULT_LIMIT;
-}
-
 function main() {
   const inp = readHookInput();
 
   // Stay out of subagents and out of the handoff turn itself.
   if (inp.agent_id || inp.stop_hook_active) return 0;
 
-  const limit = resolveLimit();
+  const { limit } = resolveLimit();
 
   pruneOldMarkers();
 

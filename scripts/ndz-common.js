@@ -53,6 +53,40 @@ function pruneOldMarkers() {
   }
 }
 
+/** The token limit the Stop hook enforces. First one that parses wins:
+ *    NDZ_LIMIT env           terminal only; Cowork tasks cannot set env vars
+ *    <dataDir>/limit         one number in a file; /no-dumb-zone:limit writes it
+ *    DEFAULT_LIMIT
+ *  Shared by ndz-check.js (reads) and ndz-limit.js (reads and writes). */
+const DEFAULT_LIMIT = 250000;
+const LIMIT_FILE = "limit";
+
+function positiveInt(s) {
+  const n = parseInt(String(s || "").trim(), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function limitFilePath(dir) {
+  return path.join(dir || dataDir(), LIMIT_FILE);
+}
+
+function limitFromFile(dir) {
+  try {
+    return positiveInt(fs.readFileSync(limitFilePath(dir), "utf8"));
+  } catch {
+    return 0;
+  }
+}
+
+/** -> { limit, source } with source one of "env", "file", "default". */
+function resolveLimit(dir) {
+  const env = positiveInt(process.env.NDZ_LIMIT);
+  if (env) return { limit: env, source: "env" };
+  const file = limitFromFile(dir);
+  if (file) return { limit: file, source: "file" };
+  return { limit: DEFAULT_LIMIT, source: "default" };
+}
+
 /** Print one JSON object to stdout. Stdout must contain nothing else. */
 function emit(obj) {
   process.stdout.write(JSON.stringify(obj));
@@ -73,4 +107,17 @@ function isCowork() {
   return process.env.CLAUDE_CODE_ENTRYPOINT === "remote_cowork";
 }
 
-module.exports = { readHookInput, dataDir, markerPath, pruneOldMarkers, emit, isCowork };
+module.exports = {
+  readHookInput,
+  dataDir,
+  markerPath,
+  pruneOldMarkers,
+  emit,
+  isCowork,
+  DEFAULT_LIMIT,
+  LIMIT_FILE,
+  positiveInt,
+  limitFilePath,
+  limitFromFile,
+  resolveLimit,
+};

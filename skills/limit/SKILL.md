@@ -1,0 +1,25 @@
+---
+name: limit
+description: Set, show or clear the no-dumb-zone token limit, the context size that triggers the handoff. Use when the user asks to change, lower, raise, check or reset the handoff limit, wants the handoff to fire sooner or later, or wants to test the handoff on the next stop. Works in the terminal and inside a Cowork task.
+argument-hint: "[tokens | show | clear]"
+allowed-tools: Bash(node *)
+---
+
+Run exactly this command with the Bash tool, then stop and relay its output to the user in one or two plain lines. Do not paraphrase numbers.
+
+```
+node "${CLAUDE_PLUGIN_ROOT}/scripts/ndz-limit.js" --data-dir "${CLAUDE_PLUGIN_DATA}" $ARGUMENTS
+```
+
+What the argument means:
+
+- a token count such as `100000`, `100k` or `0.5m`: write it to the plugin's `limit` file. The Stop hook uses it from the next stop on, unless `NDZ_LIMIT` is set in the environment, which always wins.
+- `show`, or no argument: print the limit the Stop hook will use and where it comes from.
+- `clear`: delete the file and go back to `NDZ_LIMIT` or the 250,000 default.
+
+Rules:
+
+- Use the Bash tool (the workspace shell), never the device shell. The hooks run where this command runs; a file written on the user's computer is never read.
+- Do not write or edit the `limit` file by hand and do not guess its path. The command above already carries the right directory.
+- If the command exits non-zero, show the user its stderr and stop.
+- In a Cowork task the file lives in the task's container and disappears when the task ends. Say so if the user seems to expect it to stick.

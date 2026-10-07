@@ -184,6 +184,37 @@ OUT=$(echo '{"session_id":"l3","transcript_path":"'"$BIG"'","stop_hook_active":f
 [ $CODE -eq 0 ] && [ -z "$OUT" ] && ok "24 unparseable limit file: default 250k, silent" || fail "24 bad limit file" "code=$CODE out=$OUT"
 rm -f "$CLAUDE_PLUGIN_DATA/limit"
 
+echo "== ndz-limit.js (/no-dumb-zone:limit) =="
+
+# --data-dir is what the skill passes from ${CLAUDE_PLUGIN_DATA}; it must beat the env fallback
+D2="$T/data2"
+OUT=$(node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D2" 100k 2>"$T/err"); CODE=$?
+[ $CODE -eq 0 ] && [ "$(cat "$D2/limit")" = "100000" ] && [ ! -f "$CLAUDE_PLUGIN_DATA/limit" ] && [[ "$OUT" == *"100,000"* ]] && [[ "$OUT" == *"was 250,000"* ]] \
+  && ok "25 limit set 100k: writes 100000 to --data-dir only, reports old and new" || fail "25 limit set" "code=$CODE out=$OUT err=$(cat $T/err)"
+
+# the hook honors what the script wrote, in that same dir
+OUT=$(echo '{"session_id":"l4","transcript_path":"'"$BIG"'","stop_hook_active":false}' | NDZ_LIMIT= CLAUDE_PLUGIN_DATA="$D2" node "$PLUGIN/scripts/ndz-check.js" 2>"$T/err"); CODE=$?; ERR=$(cat "$T/err")
+[ $CODE -eq 2 ] && [[ "$ERR" == *"100,000 limit"* ]] && ok "26 hook reads the limit the script wrote: 180k over 100k, exit 2" || fail "26 script->hook" "code=$CODE err=$ERR"
+
+OUT=$(node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D2" show 2>"$T/err"); CODE=$?
+[ $CODE -eq 0 ] && [[ "$OUT" == *"100,000 tokens (from the limit file)"* ]] && [[ "$OUT" == *"$D2/limit"* ]] && ok "27 limit show: names the file and the source" || fail "27 limit show" "code=$CODE out=$OUT"
+OUT=$(NDZ_LIMIT=130000 node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D2" 2>"$T/err"); CODE=$?
+[ $CODE -eq 0 ] && [[ "$OUT" == *"130,000 tokens (from NDZ_LIMIT)"* ]] && [[ "$OUT" == *"takes precedence"* ]] && ok "27b limit show with NDZ_LIMIT set: env wins, says so" || fail "27b show env" "code=$CODE out=$OUT"
+
+OUT=$(node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D2" clear 2>"$T/err"); CODE=$?
+[ $CODE -eq 0 ] && [ ! -f "$D2/limit" ] && [[ "$OUT" == *"250,000"* ]] && ok "28 limit clear: file gone, reports the default" || fail "28 limit clear" "code=$CODE out=$OUT ls=$(ls $D2)"
+
+for bad in abc 0 -5 "1 2"; do
+  OUT=$(node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D2" $bad 2>"$T/err"); CODE=$?
+  [ $CODE -eq 1 ] && [ ! -f "$D2/limit" ] && [[ "$(cat $T/err)" == *"usage:"* ]] || { fail "29 limit rejects '$bad'" "code=$CODE out=$OUT err=$(cat $T/err)"; bad=FAILED; break; }
+done
+[ "$bad" != FAILED ] && ok "29 limit rejects abc, 0, -5, two args: exit 1, usage on stderr, no file"
+
+# empty or unsubstituted --data-dir falls back to the hooks' own dataDir()
+OUT=$(node "$PLUGIN/scripts/ndz-limit.js" --data-dir "" 0.5m 2>"$T/err"); CODE=$?
+[ $CODE -eq 0 ] && [ "$(cat "$CLAUDE_PLUGIN_DATA/limit")" = "500000" ] && [[ "$OUT" == *"Above the 250,000 default"* ]] && ok "30 empty --data-dir: falls back to CLAUDE_PLUGIN_DATA, 0.5m parses, warns above default" || fail "30 fallback dir" "code=$CODE out=$OUT"
+rm -f "$CLAUDE_PLUGIN_DATA/limit"
+
 echo
 echo "$PASS passed, $FAIL failed"
 rm -rf "$T"

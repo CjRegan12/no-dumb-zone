@@ -61,7 +61,8 @@ Use `tar -a`, not `Compress-Archive`: the latter writes backslash entry names th
 | --- | --- | --- | --- |
 | `NDZ_LIMIT` | `env` block in `~/.claude/settings.json` (`C:\Users\regan\.claude\settings.json`), or a project's `.claude/settings.json` | `250000` | Tokens. Must be below your auto-compact point or the hook never fires. On a 200k model use ~130000. |
 | `autoCompactEnabled` | same settings file | `true` | Set `false` to let this plugin replace compaction instead of racing it. |
-| `limit` file | `$CLAUDE_PLUGIN_DATA/limit` (`~/.claude/plugins/data/no-dumb-zone-synced/limit` for the synced plugin) | none | One number. Used when `NDZ_LIMIT` is unset. The only way to change the limit from inside a Cowork task, where env vars can't be set: ask Claude to write it in its workspace shell. The Cowork container is thrown away with the task, so it lasts one task. |
+| `/no-dumb-zone:limit` | a skill; `/no-dumb-zone:limit 100000`, `100k`, `show`, `clear` | | Writes, prints or removes the `limit` file below and tells you which limit the hook will actually use. Works in the terminal and inside a Cowork task. Claude also runs it when you say "lower the handoff limit to 100k". |
+| `limit` file | `$CLAUDE_PLUGIN_DATA/limit` (`~/.claude/plugins/data/no-dumb-zone-synced/limit` for the uploaded plugin, `.../no-dumb-zone-inline/limit` for `--plugin-dir`) | none | One number. Used when `NDZ_LIMIT` is unset. The only way to change the limit from inside a Cowork task, where env vars can't be set. In the terminal it persists across sessions; a Cowork container is thrown away with the task, so there it lasts one task. |
 
 Example settings:
 
@@ -83,8 +84,10 @@ no-dumb-zone/
   scripts/ndz-check.js            Stop: measure context, force the handoff once, then nag
   scripts/ndz-allow-handoff.js    PermissionRequest: approve the Skill call for this plugin's handoff, nothing else
   scripts/ndz-pickup.js           UserPromptSubmit: brief (and in the terminal, name) the new session from NOTES.md
-  scripts/ndz-common.js           shared helpers, surface detection
+  scripts/ndz-limit.js            set / show / clear the limit file; what /no-dumb-zone:limit runs
+  scripts/ndz-common.js           shared helpers, surface detection, limit resolution
   skills/handoff/SKILL.md         the handoff procedure Claude follows
+  skills/limit/SKILL.md           /no-dumb-zone:limit [tokens | show | clear]
 ```
 
 Per-session markers live in `$CLAUDE_PLUGIN_DATA` (or `~/.cache/no-dumb-zone` when run by hand) and are pruned after 7 days.
@@ -109,7 +112,7 @@ claude --plugin-dir C:\Users\regan\source\repos\no-dumb-zone
 
 Ask for one small thing. Claude should finish it, then run the handoff and tell you to `/clear`. Clear, type anything, and the session title should match the first line of `NOTES.md`. Remove `$env:NDZ_LIMIT` afterwards (`Remove-Item Env:NDZ_LIMIT`) or close the terminal.
 
-**Cowork:** no env vars, so use the limit file. In a task with the project folder connected, say: "run `echo 1000 > ~/.claude/plugins/data/no-dumb-zone-synced/limit` in your workspace shell, then do one small thing". Claude should finish it, run the handoff into the connected folder, and end with the two-line message. Start a new task, paste the second line, and Claude should read `NOTES.md` from the folder on its first turn.
+**Cowork:** no env vars, so use the limit file. In a task with the project folder connected, type `/no-dumb-zone:limit 1000`, then ask for one small thing. Claude should finish it, run the handoff into the connected folder, and end with the two-line message. Start a new task, paste the second line, and Claude should read `NOTES.md` from the folder on its first turn.
 
 Run a hook by hand with fake input:
 
@@ -119,7 +122,8 @@ Run a hook by hand with fake input:
 
 ## Troubleshooting
 
-- **Nothing happens at the limit.** Auto-compact probably fired first. Lower `NDZ_LIMIT` (or the `limit` file) or set `autoCompactEnabled: false`.
+- **Nothing happens at the limit.** Auto-compact probably fired first. Lower the limit (`/no-dumb-zone:limit 130000`) or set `autoCompactEnabled: false`.
+- **`/no-dumb-zone:limit` wrote the file but the hook still uses the old number.** `NDZ_LIMIT` in the environment wins over the file; `/no-dumb-zone:limit show` says so when that is the case. In Cowork the file is per task, so a limit set in one task does not carry into the next.
 - **Cowork task started without the folder connected.** The pickup hook still fires; it tells Claude to request access to the project folder rather than search its workspace. Connecting the folder when you start the task skips that step.
 - **`<hook> hook error` in the transcript.** Run `claude --debug-file ndz.log` and read the log. Usually `node` isn't on PATH for the process that launched Claude, or the transcript layout changed; `ndz-check.js` looks for `message.usage` on `type: assistant` lines.
 - **Session didn't get named (terminal).** The hook skips sessions that already have a title (`--name`, `/rename`). It also only acts on the first prompt; check `/hooks` to confirm `UserPromptSubmit` is listed.
