@@ -27,7 +27,7 @@ The plugin detects which surface it is on (`CLAUDE_CODE_ENTRYPOINT=remote_cowork
 
 So in Cowork the handoff ends with two lines: the confirmation, and a line like `inkbook: booking flow (3). Continue from NOTES.md.` Start a new task in the same folder and paste that line. The chat gets a real name and Claude goes straight to the notes.
 
-That paste line is also how a limit survives in Cowork. The `limit` file lives in the task's container and dies with it, so when the limit came from `/no-dumb-zone:limit`, the handoff line ends with `Then /no-dumb-zone:limit 150000.` and the pickup hook in the next task writes the file from that first message before Claude takes a turn. Test-sized limits (under 10k) are never carried, so a `/no-dumb-zone:limit 1000` test does not re-fire in every task after it.
+That paste line is also how a limit survives in Cowork. The `limit` file lives in the task's container and dies with it, so when the limit came from `/no-dumb-zone:limit`, the handoff line ends with `Then /no-dumb-zone:limit 150000.` and the pickup hook in the next task writes the file from that first message before Claude takes a turn. Test-sized limits (under 10k) are never carried, so a `/no-dumb-zone:limit 1000` test does not re-fire in every task after it. It also works when the task's first turn restarts the session (it does when linking your computer loads the device tools): the hook then reads your first message from the transcript.
 
 ## Requirements
 

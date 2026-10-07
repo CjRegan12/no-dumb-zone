@@ -257,6 +257,36 @@ OUT2=$(echo '{"session_id":"k7","cwd":"'"$CLAUDE_PROJECT_DIR"'","prompt":"x. The
 [ $CODE -eq 0 ] && [ $CODE2 -eq 0 ] && [ ! -f "$D5/limit" ] && [[ "$OUT" != *"applied"* ]] && [[ "$OUT2" != *"applied"* ]] \
   && ok "36 no carry line in Cowork, or carry line in the terminal: no limit file written" || fail "36 no stray writes" "code=$CODE code2=$CODE2 out=$OUT out2=$OUT2 ls=$(ls $D5 2>&1)"
 
+# restarted session (seen when linking the computer loaded the device tools): the hook's first prompt is the
+# harness line and the user's message is only in the transcript, behind system-reminder blocks and after a
+# reminder-only user line; a tool_result that mentions a limit is not a prompt
+D6="$T/data6"; RL="$T/relaunch.jsonl"
+{
+  echo '{"type":"user","isSidechain":false,"message":{"role":"user","content":"<system-reminder>linked</system-reminder>"}}'
+  echo '{"type":"user","isSidechain":false,"message":{"role":"user","content":[{"type":"text","text":"<system-reminder>The timezone is America/New_York.</system-reminder>"},{"type":"text","text":"inkbook: booking flow (4). Continue from NOTES.md. Then /no-dumb-zone:limit 150k."}]}}'
+  echo '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":1,"cache_read_input_tokens":1,"cache_creation_input_tokens":1}}}'
+  echo '{"type":"user","isSidechain":false,"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"x. Then /no-dumb-zone:limit 1000."}]}}'
+  echo '{"type":"user","isSidechain":false,"message":{"role":"user","content":[{"type":"text","text":"Continue with the task described in the conversation above."}]}}'
+} > "$RL"
+OUT=$(echo '{"session_id":"k8","transcript_path":"'"$RL"'","cwd":"'"$CLAUDE_PROJECT_DIR"'","prompt":"Continue with the task described in the conversation above."}' | NDZ_SURFACE=cowork CLAUDE_PLUGIN_DATA="$D6" node "$PLUGIN/scripts/ndz-pickup.js" 2>"$T/err"); CODE=$?; ERR=$(cat "$T/err")
+[ $CODE -eq 0 ] && [ "$(cat "$D6/limit" 2>/dev/null)" = "150000" ] && [[ "$OUT" == *"150,000"* ]] && [[ "$OUT" == *"no need to run the limit skill"* ]] && [[ "$OUT" == *'$HOME/mnt/<folder>/NOTES.md'* ]] \
+  && ok "36b restarted session: carry line read from the transcript's first real prompt, limit file = 150000" || fail "36b transcript fallback" "code=$CODE out=$OUT err=$ERR ls=$(ls $D6 2>&1)"
+
+# once per container: a pickup marker from another session id (a restart later in the task) means no re-apply,
+# and a limit line that only appears in a later prompt is not the paste line; a missing transcript is fine
+D7="$T/data7"; mkdir -p "$D7"; touch "$D7/pickup-k8"
+OUT=$(echo '{"session_id":"k9","transcript_path":"'"$RL"'","cwd":"'"$CLAUDE_PROJECT_DIR"'","prompt":"Continue with the task described in the conversation above."}' | NDZ_SURFACE=cowork CLAUDE_PLUGIN_DATA="$D7" node "$PLUGIN/scripts/ndz-pickup.js" 2>"$T/err"); CODE=$?
+LATE="$T/late.jsonl"
+{
+  echo '{"type":"user","isSidechain":false,"message":{"role":"user","content":"inkbook: booking flow (4). Continue from NOTES.md."}}'
+  echo '{"type":"user","isSidechain":false,"message":{"role":"user","content":"/no-dumb-zone:limit 150k"}}'
+} > "$LATE"
+D8="$T/data8"
+OUT2=$(echo '{"session_id":"k10","transcript_path":"'"$LATE"'","cwd":"'"$CLAUDE_PROJECT_DIR"'","prompt":"Continue with the task described in the conversation above."}' | NDZ_SURFACE=cowork CLAUDE_PLUGIN_DATA="$D8" node "$PLUGIN/scripts/ndz-pickup.js" 2>"$T/err"); CODE2=$?
+OUT3=$(echo '{"session_id":"k11","transcript_path":"'"$T"'/nope.jsonl","cwd":"'"$CLAUDE_PROJECT_DIR"'","prompt":"hi"}' | NDZ_SURFACE=cowork CLAUDE_PLUGIN_DATA="$D8" node "$PLUGIN/scripts/ndz-pickup.js" 2>"$T/err"); CODE3=$?
+[ $CODE -eq 0 ] && [ ! -f "$D7/limit" ] && [[ "$OUT" != *"applied"* ]] && [ -f "$D7/pickup-k9" ] && [ $CODE2 -eq 0 ] && [ ! -f "$D8/limit" ] && [[ "$OUT2" != *"applied"* ]] && [ $CODE3 -eq 0 ] && [[ "$OUT3" == *"NOTES.md"* ]] \
+  && ok "36c no re-apply after an earlier pickup in this container; a later prompt's limit line is not the paste line; missing transcript is harmless" || fail "36c guard" "code=$CODE out=$OUT code2=$CODE2 out2=$OUT2 code3=$CODE3 out3=$OUT3 ls7=$(ls $D7 2>&1) ls8=$(ls $D8 2>&1)"
+
 # /no-dumb-zone:limit in Cowork says what happens to the file
 OUT=$(NDZ_SURFACE=cowork node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D5" 150k 2>"$T/err"); CODE=$?
 OUT2=$(NDZ_SURFACE=cowork node "$PLUGIN/scripts/ndz-limit.js" --data-dir "$D5" show 2>"$T/err"); CODE2=$?

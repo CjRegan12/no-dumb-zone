@@ -21,7 +21,10 @@
  *                                   because the limit file died with the last
  *                                   task's container. Write it to this task's
  *                                   limit file here, so the Stop hook has it
- *                                   before Claude does anything.
+ *                                   before Claude does anything. When the
+ *                                   session restarted on its first turn, that
+ *                                   message is only in the transcript, so it
+ *                                   is read from there (limitFromTranscript).
  *
  * Why UserPromptSubmit and not SessionStart: SessionStart also accepts
  * sessionTitle but ignores it when the session started from /clear, which is
@@ -38,6 +41,7 @@ const {
   emit,
   isCowork,
   limitFromPrompt,
+  limitFromTranscript,
   writeLimitFile,
 } = require("./ndz-common");
 
@@ -58,6 +62,18 @@ function gitBranch(root) {
     }).trim();
   } catch {
     return "";
+  }
+}
+
+/** True when a pickup marker for another session id sits in the data dir. A
+ *  Cowork container belongs to one task, so that only happens when the session
+ *  restarted after this task's first prompt was already handled. */
+function otherPickupRan(sessionId) {
+  const mine = path.basename(markerPath("pickup", sessionId));
+  try {
+    return fs.readdirSync(dataDir()).some((n) => n.startsWith("pickup-") && n !== mine);
+  } catch {
+    return false;
   }
 }
 
@@ -84,9 +100,15 @@ function main() {
   const cowork = isCowork();
 
   // Cowork carry-over: apply a limit the previous task's handoff put in the paste line.
+  // The paste line is the user's first message, which is not always this hook's
+  // first prompt: a session that restarted on its first turn starts on a harness
+  // line, and the user's message is then only in the transcript. Once per
+  // container: a pickup marker from another session id means this task's first
+  // prompt was already handled, and a restart later in the task must not re-apply
+  // a limit the user may have cleared since.
   let carried = 0;
-  if (cowork) {
-    carried = limitFromPrompt(inp.prompt);
+  if (cowork && !otherPickupRan(inp.session_id)) {
+    carried = limitFromPrompt(inp.prompt) || limitFromTranscript(inp.transcript_path);
     if (carried) {
       try {
         writeLimitFile(dataDir(), carried);

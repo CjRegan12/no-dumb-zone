@@ -124,6 +124,44 @@ function limitFromPrompt(text) {
   return m ? parseTokens(m[1].replace(/[.,;:!?)\]]+$/, "")) : 0;
 }
 
+/** The transcript side of the same reader. The pickup hook's first prompt is not
+ *  always the user's first message: when a Cowork task's first turn restarts the
+ *  session (seen when linking the computer loaded the device tools), the restarted
+ *  session's first prompt is a harness line ("Continue with the task described in
+ *  the conversation above.") and the user's message survives only in the
+ *  transcript, which the restarted session inherits. This returns the limit in the
+ *  first real user prompt there: the first `type: "user"` line with text left once
+ *  tool results and <system-reminder> blocks are dropped. 0 when there is none. */
+function limitFromTranscript(transcriptPath) {
+  let raw;
+  try {
+    raw = fs.readFileSync(transcriptPath, "utf8");
+  } catch {
+    return 0;
+  }
+  for (const line of raw.split("\n")) {
+    if (!line.includes('"user"')) continue;
+    let e;
+    try {
+      e = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (e.type !== "user" || e.isSidechain) continue;
+    const content = e.message && e.message.content;
+    const text = (typeof content === "string"
+      ? content
+      : Array.isArray(content)
+        ? content.filter((b) => b && b.type === "text").map((b) => b.text || "").join("\n")
+        : "")
+      .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
+      .trim();
+    if (!text) continue;
+    return limitFromPrompt(text);
+  }
+  return 0;
+}
+
 function writeLimitFile(dir, tokens) {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(limitFilePath(dir), String(tokens) + "\n");
@@ -167,5 +205,6 @@ module.exports = {
   TEST_SIZED_BELOW,
   parseTokens,
   limitFromPrompt,
+  limitFromTranscript,
   writeLimitFile,
 };
