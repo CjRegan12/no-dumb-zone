@@ -21,6 +21,7 @@
 
 ## Next steps
 1. Use the plugin on InkBook for a day, then decide nag frequency, auto-commit vs stage-only, and whether project repos commit `NOTES.md` or gitignore it.
+2. 0.4.0 (the mod: `hooks/register.ts`, `tests/ndz-mod.test.ts`, `"modules"` in `hooks.json`, README + CLAUDE.md) is in the working tree, UNCOMMITTED, written 2026-10-07 from a Cowork task. Checked there: `claude plugin validate .`, `claude plugin test .` (8 pass), `bash scripts/test.sh` (49 pass), and three headless over-limit runs with the mod loaded (handoff fired, committed). Not checked: the band and button in a real terminal, and whether Claude Code older than 2.1.287 accepts the `modules` line. Next: from PowerShell `claude --version`, then `claude --plugin-dir C:\Users\regan\source\repos\no-dumb-zone` in a scratch repo and look for the `NDZ ...` line above the prompt; press `Handoff now`; then commit, rebuild the zip, upload.
 
 ## Open questions for the user
 - After a week at 600k in Cowork: any sign of the dumb zone (wrong file edits, forgotten constraints, repeated mistakes late in a task)? If yes, the data says 400k; `/no-dumb-zone:limit 400k` carries from task to task without a re-upload.

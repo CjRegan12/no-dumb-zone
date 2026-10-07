@@ -4,6 +4,7 @@ Claude Code plugin: Stop hook forces a handoff past a token limit, PermissionReq
 
 ## Commands
 
+- Mod tests: `claude plugin test .` (8 cases in `tests/ndz-mod.test.ts`; no session, sign-in or network; runs in the Cowork container and on Windows). `claude plugin validate .` lists what `hooks/register.ts` hooks and calls.
 - Unit tests: `bash scripts/test.sh` (49 cases; needs bash, so Git Bash on Windows or the Cowork VM). The suite pins `NDZ_SURFACE=terminal` and overrides per case, so it passes identically inside a Cowork session.
 - Validate: `claude plugin validate .` picks `marketplace.json` once that exists; pass `.claude-plugin/plugin.json` to validate the plugin manifest. The Cowork container has `claude` too: stage the plugin files into `/mnt/user-data/uploads/no-dumb-zone/` and validate there. From that copy, `claude -p "/no-dumb-zone:limit show" --plugin-dir /mnt/user-data/uploads/no-dumb-zone --allowedTools "Bash(node *)"` is a real headless test of a skill (unset `CLAUDE_CODE_ENTRYPOINT` first or it reports the Cowork surface).
 - Live test: in a scratch git repo, `$env:NDZ_LIMIT="1000"; claude --plugin-dir C:\Users\regan\source\repos\no-dumb-zone`, ask for one small file, watch the handoff run.
@@ -24,7 +25,16 @@ Claude Code plugin: Stop hook forces a handoff past a token limit, PermissionReq
 - Surface detection lives in `ndz-common.js` `isCowork()`: `CLAUDE_CODE_ENTRYPOINT=remote_cowork` (verified from inside a live Cowork task), overridable with `NDZ_SURFACE`. Every surface-specific string in the scripts and the skill branches on it; keep it that way rather than scattering env checks.
 - Cowork is a different shape, not just a different UI: hooks run in a cloud container whose cwd is `/home/claude`, and the user's project folder is only reachable through the device tools (`$HOME/mnt/<folder>` in `device_bash`). So in Cowork the hooks can never read or write `NOTES.md`; the skill writes it on the device and the pickup hook tells Claude to read it from there. Cowork also names chats from the first message and ignores `sessionTitle`.
 
+- The mod (`hooks/register.ts`, loaded through `"modules"` in `hooks.json`, Claude Code 2.1.287+) is display and shortcuts only: band above the prompt, `Handoff now`, `/ndz`, `/clear` prefill. The Stop hook stays the one thing that fires the handoff past the limit, so the plugin is unchanged wherever the mod does not load or draw. Keep it that way; a second trigger in the mod would double-fire.
+- The mod cannot import the CommonJS scripts (a hooks module is an ES module in its own environment, no Node), so limit resolution and surface detection are written twice: `resolveLimit`/`isCowork` in `ndz-common.js` and `refresh()` in `register.ts`. Change them together.
+- The mod finds the hooks' data dir itself (`dataDirFrom`): `CLAUDE_PLUGIN_DATA` if its process has it, else `<CLAUDE_CONFIG_DIR or ~/.claude>/plugins/data/no-dumb-zone-<inline|synced|marketplace name>` worked out from `$.plugin.root`. Verified for `--plugin-dir` (a `limit` file in `no-dumb-zone-inline` showed up in `/ndz`).
+- Mod and hook talk through the `handoff-<session id>` marker. `Handoff now` writes it before submitting the handoff prompt, so a later over-limit stop reminds instead of re-running. The mod's `classic.Stop` hook wraps `ndz-check.js`: marker absent before and present after means the handoff turn is starting; present before means it just ended, which is when `/clear` is put in the prompt box.
+
 ## Gotchas
+
+- Stop hook misses the first turn in a never-used folder: `claude -p` in a brand-new project dir, limit 1000, replied and exited with no handoff, 3 runs of 3, with and without the mod (0.3.2 does it too). The same run in a folder that already had a transcript fired every time. Most likely the transcript is not on disk yet when the first Stop runs, so `contextTokens` reads 0. Harmless interactively (the next stop catches it), but an end-to-end test needs a warm folder or two turns.
+- Loading the repo with `--plugin-dir` makes Claude Code write `.claude-plugin/types/` and a root `tsconfig.json` (type declarations for the mod). Both are gitignored and stay out of the upload zip.
+- In a mod test, every `on(...)` stub must be registered before the first call on `$`; calling `on` later throws. One `world()` per test, never one per loop iteration.
 
 - Transcript layout: `type: "assistant"` lines carry `message.usage` with `input_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`; their sum is the live context. Verified against real transcripts.
 - A `claude -p` run started from inside a Claude session inherits the parent `session_id`, so clear `~/.claude/plugins/data/no-dumb-zone-*/` markers between end-to-end runs.

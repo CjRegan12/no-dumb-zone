@@ -13,6 +13,17 @@ Long sessions compacted over and over lose the constraints you stated early, and
 
 It never interrupts a task. `Stop` only fires when Claude has stopped on its own, so a task in progress always finishes first.
 
+## The meter (Claude Code 2.1.287+)
+
+On Claude Code 2.1.287 or later the plugin also loads a small [mod](https://code.claude.com/docs/en/plugins/mods/overview), `hooks/register.ts`. It changes nothing about when the handoff fires; the hooks above still own that. It adds:
+
+- **A line above the prompt** in the terminal and the desktop app's Code tab: `NDZ 212k / 500k  42%`, dim until 80% of the limit, then highlighted. The count is Claude Code's own context figure, refreshed after every turn.
+- **A `Handoff now` button** on that line, and `/ndz handoff` for the keyboard. Either one runs the same handoff the hook would, before the limit.
+- **`/clear` waiting in the prompt box** once the handoff turn ends, so starting fresh is one Enter. A draft you are typing is never overwritten; the line then shows a `Put /clear in the prompt` button instead.
+- **`/ndz`**, which prints the same figures as text. It runs without a model turn, and it is the way to read the meter where nothing is drawn, such as `claude -p`. Not yet checked inside a Cowork task.
+
+Nothing here is needed for the handoff to work. Where the mod does not load, or draws nothing, the plugin behaves exactly as before.
+
 ## Terminal vs Cowork
 
 The plugin detects which surface it is on (`CLAUDE_CODE_ENTRYPOINT=remote_cowork` means Cowork; `NDZ_SURFACE=cowork|terminal` overrides) and behaves differently, because Cowork is a different shape:
@@ -31,7 +42,7 @@ That paste line is also how a limit survives in Cowork. The `limit` file lives i
 
 ## Requirements
 
-- Claude Code v2.1.251 or later
+- Claude Code v2.1.251 or later for the hooks; v2.1.287 or later for the meter. The 0.4.0 `hooks.json` has only been run on 2.1.293, so if an older Claude Code rejects its `modules` line, stay on 0.3.2 or update.
 - `node` on PATH (v18+). Node is the one interpreter that spawns by the same name on Windows, macOS, Linux and the Cowork workspace, which is why the hooks use it.
 - `git` on PATH for the commit step and the branch-name fallback
 
@@ -90,7 +101,8 @@ Run `/context` in a session to see your window size and current usage.
 ```
 no-dumb-zone/
   .claude-plugin/plugin.json
-  hooks/hooks.json                three hooks, exec form, node
+  hooks/hooks.json                three hooks, exec form, node, plus the mod's entry under "modules"
+  hooks/register.ts               the mod: meter above the prompt, Handoff now, /ndz, /clear prefill
   scripts/ndz-check.js            Stop: measure context, force the handoff once, then nag
   scripts/ndz-allow-handoff.js    PermissionRequest: approve the Skill call for this plugin's handoff, nothing else
   scripts/ndz-pickup.js           UserPromptSubmit: brief (and in the terminal, name) the new session from NOTES.md
@@ -98,6 +110,7 @@ no-dumb-zone/
   scripts/ndz-common.js           shared helpers, surface detection, limit resolution
   skills/handoff/SKILL.md         the handoff procedure Claude follows
   skills/limit/SKILL.md           /no-dumb-zone:limit [tokens | show | clear]
+  tests/ndz-mod.test.ts           the mod's tests (claude plugin test .); not part of the upload
 ```
 
 Per-session markers live in `$CLAUDE_PLUGIN_DATA` (or `~/.cache/no-dumb-zone` when run by hand) and are pruned after 7 days.
@@ -145,6 +158,6 @@ Run a hook by hand with fake input:
 
 ## Not in scope (yet)
 
-- Pressing `/clear` or opening the new task for you. Hooks can't run slash commands or drive the Cowork UI.
+- Pressing `/clear` or opening the new task for you. Hooks can't run slash commands or drive the Cowork UI. In the terminal the mod gets as close as it can: `/clear` is typed into the prompt box and you press Enter.
 - Naming a Cowork chat from a hook. Cowork ignores `sessionTitle`; the pasted first line is the workaround.
 - A percentage limit instead of a token count.

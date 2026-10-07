@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 node_modules/
 dist/
+# written by Claude Code when it loads the mod from this folder
+.claude-plugin/types/
+tsconfig.json

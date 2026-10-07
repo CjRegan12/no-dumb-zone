@@ -1,5 +1,6 @@
 {
   "description": "no-dumb-zone: force a handoff when context passes NDZ_LIMIT, and brief + name the next session from NOTES.md",
+  "modules": ["./register.ts"],
   "hooks": {
     "Stop": [
       {
