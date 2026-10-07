@@ -1,9 +1,16 @@
 {
   "name": "no-dumb-zone",
-  "version": "0.1.1",
-  "description": "Hands off and clears before context gets dumb. Past a token limit, the next time Claude stops it writes NOTES.md + CLAUDE.md, commits, and tells you to start a fresh session. The new session names itself and starts briefed.",
+  "version": "0.2.0",
+  "description": "Hands off and clears before context gets dumb. Past a token limit, the next time Claude stops it writes NOTES.md + CLAUDE.md, commits, and tells you to start fresh. The next session starts briefed. Terminal and Cowork.",
   "author": {
     "name": "CJ Regan"
   },
-  "keywords": ["context", "handoff", "compaction", "session", "hooks"]
+  "keywords": [
+    "context",
+    "handoff",
+    "compaction",
+    "session",
+    "hooks",
+    "cowork"
+  ]
 }

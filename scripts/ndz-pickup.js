@@ -10,6 +10,12 @@
  *                                   the new session starts briefed.
  *   no NOTES.md                  -> session title = "<folder>: <git branch>"
  *                                   when on a feature branch. Nothing else.
+ *   Cowork, no NOTES.md          -> the project folder is on the user's
+ *                                   computer and this hook cannot read it, so
+ *                                   Claude is told where the notes live and
+ *                                   reads them itself. Cowork names chats from
+ *                                   the first message and ignores sessionTitle,
+ *                                   so none is sent.
  *
  * Why UserPromptSubmit and not SessionStart: SessionStart also accepts
  * sessionTitle but ignores it when the session started from /clear, which is
@@ -19,7 +25,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
-const { readHookInput, markerPath, emit } = require("./ndz-common");
+const { readHookInput, markerPath, emit, isCowork } = require("./ndz-common");
 
 const NOTES_FILE = "NOTES.md";
 const MAX_CONTEXT_CHARS = 9000; // Claude Code caps additionalContext at 10k
@@ -74,6 +80,15 @@ function main() {
       `Handoff notes from the previous session (${NOTES_FILE} in the project root). ` +
       "Pick up from the next steps listed here.\n\n" +
       body;
+  } else if (isCowork()) {
+    out.additionalContext =
+      "no-dumb-zone: this is a Cowork task, so the project folder is on the user's computer, " +
+      "not in this workspace, and this hook cannot read it. When a project folder is connected, " +
+      `a previous session may have left handoff notes at ${NOTES_FILE} in that folder's root ` +
+      `($HOME/mnt/<folder>/${NOTES_FILE} in the device shell). Reading that file before anything ` +
+      "else is how this session continues where the last one stopped: its Next steps section is " +
+      "the plan, and CLAUDE.md beside it holds durable project facts. " +
+      `No ${NOTES_FILE} means there is no handoff to pick up.`;
   } else {
     const branch = gitBranch(root);
     if (branch && branch !== "main" && branch !== "master") {

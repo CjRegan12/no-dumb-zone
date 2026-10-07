@@ -18,7 +18,7 @@
  */
 
 const fs = require("fs");
-const { readHookInput, markerPath, pruneOldMarkers, emit } = require("./ndz-common");
+const { readHookInput, markerPath, pruneOldMarkers, emit, isCowork } = require("./ndz-common");
 
 const DEFAULT_LIMIT = 250000;
 const TAIL_BYTES = 512 * 1024; // read this much from the end of the transcript first
@@ -95,13 +95,15 @@ function main() {
 
   const marker = markerPath("handoff", inp.session_id);
   const fmt = (n) => n.toLocaleString("en-US");
+  const cowork = isCowork();
 
   if (fs.existsSync(marker)) {
     emit({
       systemMessage:
-        `NO DUMB ZONE: context is ${fmt(ctx)} tokens. ` +
-        "The handoff is already written. Start a fresh session: " +
-        "a new task in Cowork, or /clear in the terminal.",
+        `NO DUMB ZONE: context is ${fmt(ctx)} tokens. The handoff is already written. ` +
+        (cowork
+          ? "Start a new task in Cowork and paste the title line from the handoff as your first message."
+          : "Run /clear to start fresh."),
     });
     return 0;
   }
@@ -110,7 +112,12 @@ function main() {
   process.stderr.write(
     `NO DUMB ZONE: context is ${fmt(ctx)} tokens, over the ${fmt(limit)} limit. ` +
       "Do not start anything new. Run the /no-dumb-zone:handoff skill now, " +
-      "follow it exactly, then stop.\n"
+      "follow it exactly, then stop. " +
+      (cowork
+        ? "Surface: Cowork. The project folder is a connected folder on the user's computer, " +
+          "not in this workspace: write NOTES.md and CLAUDE.md there and commit there."
+        : "Surface: terminal.") +
+      "\n"
   );
   return 2;
 }

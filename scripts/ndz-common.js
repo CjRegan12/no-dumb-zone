@@ -56,4 +56,19 @@ function emit(obj) {
   process.stdout.write(JSON.stringify(obj));
 }
 
-module.exports = { readHookInput, dataDir, markerPath, pruneOldMarkers, emit };
+/** Which surface the session is on.
+ *
+ *  Cowork tasks run Claude Code in a throwaway cloud container. The user's
+ *  project folder is on their computer, reached through the device tools,
+ *  and is NOT on this filesystem, so hooks cannot read or write it. The
+ *  terminal, VS Code and Claude Code on the web all have the project on disk.
+ *
+ *  Detection: Claude Code sets CLAUDE_CODE_ENTRYPOINT=remote_cowork in Cowork
+ *  tasks. NDZ_SURFACE=cowork|terminal overrides it, for tests and odd setups. */
+function isCowork() {
+  const forced = (process.env.NDZ_SURFACE || "").toLowerCase();
+  if (forced) return forced === "cowork";
+  return process.env.CLAUDE_CODE_ENTRYPOINT === "remote_cowork";
+}
+
+module.exports = { readHookInput, dataDir, markerPath, pruneOldMarkers, emit, isCowork };

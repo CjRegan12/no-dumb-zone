@@ -5,6 +5,8 @@ PLUGIN=$(cd "$(dirname "$0")/.." && pwd)
 T=$(mktemp -d)
 export CLAUDE_PLUGIN_DATA="$T/data"
 export CLAUDE_PROJECT_DIR="$T/proj"
+export NDZ_SURFACE=terminal      # pin the surface; Cowork cases override per call
+unset CLAUDE_CODE_ENTRYPOINT
 mkdir -p "$CLAUDE_PROJECT_DIR"
 PASS=0; FAIL=0
 ok()   { PASS=$((PASS+1)); echo "  PASS  $1"; }
@@ -30,7 +32,7 @@ run_pickup() { # $1=json stdin -> OUT ERR CODE
   OUT=$(echo "$1" | node "$PLUGIN/scripts/ndz-pickup.js" 2>"$T/err"); CODE=$?; ERR=$(cat "$T/err")
 }
 
-echo "== ndz_check.py =="
+echo "== ndz-check.js =="
 
 run_check '{"session_id":"s1","transcript_path":"'"$SMALL"'","stop_hook_active":false}' 250000
 [ $CODE -eq 0 ] && [ -z "$OUT" ] && ok "1 under limit: exit 0, silent" || fail "1 under limit" "code=$CODE out=$OUT err=$ERR"
@@ -39,12 +41,12 @@ run_check '{"session_id":"s2","transcript_path":"'"$BIG"'","stop_hook_active":fa
 [ $CODE -eq 0 ] && [ -z "$OUT" ] && ok "1b 180k under 250k: exit 0" || fail "1b 180k under 250k" "code=$CODE out=$OUT"
 
 run_check '{"session_id":"s3","transcript_path":"'"$BIG"'","stop_hook_active":false}' 100000
-[ $CODE -eq 2 ] && [[ "$ERR" == *"180,000"* ]] && [[ "$ERR" == *"/no-dumb-zone:handoff"* ]] && [ -f "$CLAUDE_PLUGIN_DATA/handoff-s3" ] \
-  && ok "2 over limit first stop: exit 2, names skill, marker written" || fail "2 over limit first stop" "code=$CODE err=$ERR"
+[ $CODE -eq 2 ] && [[ "$ERR" == *"180,000"* ]] && [[ "$ERR" == *"/no-dumb-zone:handoff"* ]] && [[ "$ERR" == *"Surface: terminal"* ]] && [ -f "$CLAUDE_PLUGIN_DATA/handoff-s3" ] \
+  && ok "2 over limit first stop: exit 2, names skill + surface, marker written" || fail "2 over limit first stop" "code=$CODE err=$ERR"
 
 run_check '{"session_id":"s3","transcript_path":"'"$BIG"'","stop_hook_active":false}' 100000
-[ $CODE -eq 0 ] && echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert "/clear" in d["systemMessage"]' 2>/dev/null \
-  && ok "3 over limit after handoff: exit 0, systemMessage nag, valid JSON" || fail "3 after handoff" "code=$CODE out=$OUT"
+[ $CODE -eq 0 ] && echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert "/clear" in d["systemMessage"] and "Cowork" not in d["systemMessage"]' 2>/dev/null \
+  && ok "3 over limit after handoff: exit 0, /clear nag, valid JSON" || fail "3 after handoff" "code=$CODE out=$OUT"
 
 run_check '{"session_id":"s4","transcript_path":"'"$BIG"'","stop_hook_active":true}' 100000
 [ $CODE -eq 0 ] && [ -z "$OUT" ] && [ ! -f "$CLAUDE_PLUGIN_DATA/handoff-s4" ] && ok "4 stop_hook_active true: exit 0, no marker" || fail "4 stop_hook_active" "code=$CODE"
@@ -76,7 +78,7 @@ touch -d '10 days ago' "$CLAUDE_PLUGIN_DATA/handoff-old"
 run_check '{"session_id":"s9","transcript_path":"'"$SMALL"'","stop_hook_active":false}' 250000
 [ ! -f "$CLAUDE_PLUGIN_DATA/handoff-old" ] && [ -f "$CLAUDE_PLUGIN_DATA/handoff-s3" ] && ok "9 prune: 10-day-old marker gone, fresh one kept" || fail "9 prune" "$(ls $CLAUDE_PLUGIN_DATA)"
 
-echo "== ndz_pickup.py =="
+echo "== ndz-pickup.js =="
 
 cat > "$CLAUDE_PROJECT_DIR/NOTES.md" <<'EOF'
 # inkbook: booking flow (3)
@@ -130,6 +132,41 @@ d = json.loads(sys.argv[1])["hookSpecificOutput"]
 assert len(d["additionalContext"]) < 10000, len(d["additionalContext"])
 assert "truncated" in d["additionalContext"]
 EOF
+
+echo "== Cowork surface =="
+
+# detection: the real env var, no override
+OUT=$(echo '{"session_id":"c0","transcript_path":"'"$BIG"'","stop_hook_active":false}' | NDZ_SURFACE= CLAUDE_CODE_ENTRYPOINT=remote_cowork NDZ_LIMIT=100000 node "$PLUGIN/scripts/ndz-check.js" 2>"$T/err"); CODE=$?; ERR=$(cat "$T/err")
+[ $CODE -eq 2 ] && [[ "$ERR" == *"Surface: Cowork"* ]] && [[ "$ERR" == *"user's computer"* ]] \
+  && ok "17 CLAUDE_CODE_ENTRYPOINT=remote_cowork detected: exit 2 says Cowork, points at the connected folder" || fail "17 cowork detect" "code=$CODE err=$ERR"
+
+# after handoff in Cowork: nag says new task, never /clear
+OUT=$(echo '{"session_id":"c0","transcript_path":"'"$BIG"'","stop_hook_active":false}' | NDZ_SURFACE=cowork NDZ_LIMIT=100000 node "$PLUGIN/scripts/ndz-check.js" 2>"$T/err"); CODE=$?
+[ $CODE -eq 0 ] && echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); m=d["systemMessage"]; assert "new task" in m and "/clear" not in m, m' 2>/dev/null \
+  && ok "18 Cowork after handoff: nag says new task, no /clear" || fail "18 cowork nag" "code=$CODE out=$OUT"
+
+# pickup in Cowork with no NOTES.md on this filesystem: context points at the device folder, no title
+rm -f "$CLAUDE_PROJECT_DIR/NOTES.md"
+OUT=$(echo '{"session_id":"c1","cwd":"'"$CLAUDE_PROJECT_DIR"'","prompt":"hi"}' | NDZ_SURFACE=cowork node "$PLUGIN/scripts/ndz-pickup.js" 2>"$T/err"); CODE=$?; ERR=$(cat "$T/err")
+python3 - "$OUT" <<'PY' && ok "19 Cowork pickup, no local notes: additionalContext names \$HOME/mnt/<folder>/NOTES.md, no sessionTitle" || fail "19 cowork pickup" "code=$CODE out=$OUT err=$ERR"
+import json, sys
+d = json.loads(sys.argv[1])["hookSpecificOutput"]
+assert d["hookEventName"] == "UserPromptSubmit"
+assert "sessionTitle" not in d, d
+assert "$HOME/mnt/<folder>/NOTES.md" in d["additionalContext"], d
+PY
+
+OUT=$(echo '{"session_id":"c1","cwd":"'"$CLAUDE_PROJECT_DIR"'","prompt":"again"}' | NDZ_SURFACE=cowork node "$PLUGIN/scripts/ndz-pickup.js" 2>"$T/err"); CODE=$?
+[ $CODE -eq 0 ] && [ -z "$OUT" ] && ok "20 Cowork pickup second prompt: silent" || fail "20 cowork second prompt" "out=$OUT"
+
+# a NOTES.md that IS on this filesystem still wins, even in Cowork (staged or local Cowork)
+printf '# agency: intake form (2)\n\n## Next steps\n1. wire the webhook\n' > "$CLAUDE_PROJECT_DIR/NOTES.md"
+OUT=$(echo '{"session_id":"c2","cwd":"'"$CLAUDE_PROJECT_DIR"'","prompt":"x"}' | NDZ_SURFACE=cowork node "$PLUGIN/scripts/ndz-pickup.js" 2>"$T/err"); CODE=$?
+python3 - "$OUT" <<'PY' && ok "21 Cowork pickup with local notes: reads them as usual" || fail "21 cowork local notes" "code=$CODE out=$OUT"
+import json, sys
+d = json.loads(sys.argv[1])["hookSpecificOutput"]
+assert "wire the webhook" in d["additionalContext"], d
+PY
 
 echo
 echo "$PASS passed, $FAIL failed"
