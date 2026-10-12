@@ -58,9 +58,17 @@ Rules for the title line:
 
 Keep the whole file under 8,000 characters. The first next step matters most: the next session reads it cold.
 
+## 2b. NORTHSTAR.md: ledger and drift (only if the file exists)
+
+If `NORTHSTAR.md` is in the project root, add or update this session's line at the top of its `## Ledger` section:
+
+`- YYYY-MM-DD · terminal|cowork · <what got done, in a few words> · touched: <main files> · drift <n>/10`
+
+Score drift the way the northstar skill's `drift` mode does, briefly: 0 means everything served `## Now`, met `## Bar` and kept every `## Rules` line; out-of-scope work, unmet Bar lines and broken Rules raise it, broken Rules most. If a line for this session is already there (the terminal hook keeps one, tagged `<!-- ndz:... -->`), replace its text and keep the tag. Do not touch any other section. No NORTHSTAR.md, skip this step.
+
 ## 3. Commit
 
-Stage `CLAUDE.md`, `NOTES.md`, and any other uncommitted work so nothing is lost:
+Stage `CLAUDE.md`, `NOTES.md`, `NORTHSTAR.md` if it exists, and any other uncommitted work so nothing is lost:
 
 ```
 git add -A

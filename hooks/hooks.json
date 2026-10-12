@@ -1,6 +1,8 @@
 {
-  "description": "no-dumb-zone: force a handoff when context passes NDZ_LIMIT, and brief + name the next session from NOTES.md",
-  "modules": ["./register.ts"],
+  "description": "no-dumb-zone: hand off past NDZ_LIMIT, brief the next session from NOTES.md, and hold every session to NORTHSTAR.md",
+  "modules": [
+    "./register.ts"
+  ],
   "hooks": {
     "Stop": [
       {
@@ -8,9 +10,20 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/ndz-check.js"],
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/ndz-check.js"
+            ],
             "timeout": 20,
             "statusMessage": "no-dumb-zone: checking context size"
+          },
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/ndz-northstar.js"
+            ],
+            "timeout": 10,
+            "statusMessage": "no-dumb-zone: checking the north star"
           }
         ]
       }
@@ -22,7 +35,9 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/ndz-allow-handoff.js"],
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/ndz-allow-handoff.js"
+            ],
             "timeout": 10
           }
         ]
@@ -34,7 +49,17 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/ndz-pickup.js"],
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/ndz-pickup.js"
+            ],
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/scripts/ndz-northstar.js"
+            ],
             "timeout": 10
           }
         ]

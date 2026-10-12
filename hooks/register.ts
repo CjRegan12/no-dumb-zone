@@ -35,6 +35,30 @@ let phase: Phase = 'idle'
 let isCowork = false
 let dir = ''
 let filledFor = ''
+let northNow = '' // first line of NORTHSTAR.md's ## Now, '' when there is none
+
+/** First non-empty line under "## Now" in NORTHSTAR.md, or ''. */
+function nowLine(text: string): string {
+  const lines = text.split(/\r?\n/)
+  const at = lines.findIndex(l => /^##\s+now\b/i.test(l))
+  if (at === -1) return ''
+  for (const l of lines.slice(at + 1)) {
+    if (/^##\s/.test(l)) break
+    const t = l.replace(/^[-*]\s*/, '').trim()
+    if (t) return t.length > 48 ? `${t.slice(0, 47)}…` : t
+  }
+  return ''
+}
+
+async function readNorthStar($: EngineInterface): Promise<void> {
+  northNow = ''
+  try {
+    const file = `${(await $.session.cwd()).replace(/[\\/]+$/, '')}/NORTHSTAR.md`
+    if (await $.fs.exists(file)) northNow = nowLine(await $.fs.read(file))
+  } catch {
+    northNow = ''
+  }
+}
 
 function positiveInt(s: string | undefined): number {
   const n = parseInt(String(s ?? '').trim(), 10)
@@ -104,6 +128,8 @@ async function refresh($: EngineInterface): Promise<void> {
   const hasMarker = marker !== '' && (await $.fs.exists(marker))
   if (!hasMarker) phase = 'idle'
   else if (phase === 'idle') phase = 'done'
+
+  await readNorthStar($)
 }
 
 function statusLine(): string {
@@ -114,7 +140,8 @@ function statusLine(): string {
       ? `context not measured yet (no turn has run), limit ${cap} tokens`
       : `${tokens.toLocaleString('en-US')} of ${cap} tokens (${percent()}%), limit`
   const state = { idle: '', writing: ' Handoff in progress.', done: ' Handoff written: start fresh.' }[phase]
-  return `${fill} from ${where}.${state}`
+  const star = northNow ? ` North Star now: ${northNow}.` : ''
+  return `${fill} from ${where}.${state}${star}`
 }
 
 /** The same request the Stop hook makes, sent on the person's say-so. */
@@ -212,7 +239,7 @@ export const register: Register = on => {
     if (e.props.hasSurvey || tokens === undefined) return next(e)
     const { Box, Text, Button } = $.ui.resolve(e)
     const pct = percent()
-    const meter = `NDZ ${short(tokens)} / ${short(limit)}  ${pct}%`
+    const meter = `NDZ ${short(tokens)} / ${short(limit)}  ${pct}%${northNow ? `   ★ ${northNow}` : ''}`
 
     if (phase === 'done') {
       return Box({
