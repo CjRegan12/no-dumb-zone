@@ -1,6 +1,6 @@
 # no-dumb-zone
 
-A Claude Code plugin that keeps Claude sharp and on target: it hands off and clears before context gets dumb, and holds every session, terminal or Cowork, to what you actually want.
+A Claude Code plugin that hands off and clears before context gets dumb.
 
 Long sessions compacted over and over lose the constraints you stated early, and Claude gets worse as the context window fills. The fix everyone knows and nobody does by hand: keep state in files, `/clear` between tasks. This plugin does it for you.
 
@@ -12,38 +12,6 @@ Long sessions compacted over and over lose the constraints you stated early, and
 4. On your first prompt in the fresh session, a `UserPromptSubmit` hook briefs Claude from `NOTES.md`. In the terminal it also names the session from the file's first line. You continue where you left off at ~20k tokens instead of 500k.
 
 It never interrupts a task. `Stop` only fires when Claude has stopped on its own, so a task in progress always finishes first.
-
-## North Star: Claude stops forgetting what you want (0.5.0)
-
-Handoffs keep Claude sharp. They do not keep it pointed at what you want. Corrections die with the session, a long session drifts off the plan, and Cowork has no idea what the terminal did yesterday. `NORTHSTAR.md` fixes that.
-
-It is one file in the project root, written by you (run `/no-dumb-zone:northstar` and Claude drafts it from your README, notes and git log, then asks you to fix it):
-
-| Section | What it holds |
-| --- | --- |
-| `## Vision` | what this is and who it is for |
-| `## Now` | the phase you are in |
-| `## Not yet` | what is out of scope for this phase |
-| `## Bar` | what "done well" means here, beyond passing tests |
-| `## Rules` | your standing corrections, in your words |
-| `## Ledger` | one line per session, terminal and Cowork, newest first |
-
-What the plugin does with it:
-
-- **Every session starts aimed.** The first prompt of a session loads Now, Not yet, Bar, Rules and the recent Ledger. In Cowork, where the hooks cannot see your computer, Claude is told to read the file from the connected folder and check `git log` since the last Ledger entry, so it catches up on what the terminal did.
-- **Long sessions get re-anchored.** Every 12 prompts the steering sections are injected again, before the start of the session has faded.
-- **You never say it twice.** When a prompt reads like a correction ("no, I told you...", "stop adding...", "from now on..."), Claude is told to save it as a Rule in your words. If the turn ends without the file updated, the `Stop` hook sends it back once: save it, or say it was a one-off.
-- **The Ledger writes itself in the terminal.** After every turn that edits files, the session's line is updated: date, surface, what you asked for, files touched. In Cowork, Claude adds the line itself.
-- **Drift gets a number.** `/no-dumb-zone:northstar drift` scores the session 0 to 10 against Now, Not yet, Bar and Rules, with evidence, and the handoff adds that score to the Ledger line. The terminal band shows the current phase: `NDZ 212k / 500k  42%   ★ Closing-line capture on a schedule`.
-
-No `NORTHSTAR.md`, no change: the plugin behaves exactly as 0.4.
-
-| Command | Does |
-| --- | --- |
-| `/no-dumb-zone:northstar` | set it up, or show it if it exists |
-| `/no-dumb-zone:northstar phase <text>` | move to a new phase |
-| `/no-dumb-zone:northstar rule <text>` | add a rule by hand |
-| `/no-dumb-zone:northstar drift` | score how far the work drifted |
 
 ## The meter (terminal and desktop Code tab, Claude Code 2.1.287+)
 

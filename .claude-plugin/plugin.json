@@ -1,7 +1,7 @@
 {
   "name": "no-dumb-zone",
-  "version": "0.5.0",
-  "description": "Keeps Claude sharp and on target. Past a token limit it hands off and clears before context gets dumb. NORTHSTAR.md holds what you want - phase, quality bar, and every correction you make, saved as a rule - and every session in the terminal or Cowork is held to it. Terminal and Cowork.",
+  "version": "0.4.2",
+  "description": "Hands off and clears before context gets dumb. Past a token limit, the next time Claude stops it writes NOTES.md + CLAUDE.md, commits, and tells you to start fresh. The next session starts briefed. Terminal and Cowork.",
   "author": {
     "name": "CJ Regan"
   },
@@ -14,9 +14,6 @@
     "compaction",
     "session",
     "hooks",
-    "cowork",
-    "intent",
-    "north-star",
-    "drift"
+    "cowork"
   ]
 }
