@@ -1,9 +1,9 @@
-# no-dumb-zone: North Star v0.5.0 rollout (1)
+# no-dumb-zone: North Star v0.5.0 rollout (2)
 
 ## Done this session
-- Built North Star into NDZ as v0.5.0, committed as 9b1fb1f: `scripts/ndz-northstar.js` (UserPromptSubmit + Stop), `skills/northstar/SKILL.md` (setup / phase / rule / show / drift), handoff skill step 2b (Ledger line + drift score), mod band shows `★ <## Now>`, README section, `scripts/test-northstar.js` (39/39 pass). Old `bash scripts/test.sh` still 55/55; `claude plugin validate .` passes.
-- Prior-art check: claude-reflect (1.6k stars) auto-captures corrections but needs manual /reflect review, writes CLAUDE.md, terminal only, no intent. vikrantjain/intent writes intent.md but never checks work against it. Intent + enforcement + cross-surface Ledger + drift score was not found anywhere.
-- Wrote a DRAFT `C:\Users\regan\source\repos\propfein\NORTHSTAR.md` with every inferred line marked `(guess)`. Waiting on CJ to confirm.
+- 2026-10-12: CJ answered the Propfein questions. Rewrote `propfein/NORTHSTAR.md` with no `(guess)` markers: Now left EMPTY on purpose (he wants closing-line capture and sigma calibration eventually but has not picked what is current); Not yet keeps no signups/payments and no new sports/bet types (he wants both later, which is what Not yet means); Bar keeps "checked against a real source" and "tested against real Supabase / DEPLOY.txt", drops "every bet traceable".
+- Built `dist/no-dumb-zone-plugin.zip` for 0.5.0 (16 files, posix names, includes skills/northstar). Tests re-run first: northstar 39/39, test.sh 55/55.
+- Earlier (rollout 1, commit 9b1fb1f): North Star built into NDZ as v0.5.0 (hook, skill, handoff step 2b, band, README, tests). Prior art checked: nothing combines intent + enforcement + cross-surface Ledger + drift score.
 
 ## Decisions and why
 - North Star ships inside NDZ, not as its own plugin: NDZ keeps Claude sharp, North Star keeps it on target. One plugin, one story, same hook setup that already fires in both terminal and Cowork.
@@ -12,16 +12,15 @@
 - Cowork Ledger lines are written by Claude (hooks there cannot touch the device folder). Terminal Ledger lines are automatic.
 
 ## Next steps
-1. Get CJ's answers to the 3 Propfein questions (Now, Not yet, Bar; draft lines are in propfein/NORTHSTAR.md marked `(guess)`), then rewrite that file without the `(guess)` markers.
-2. Package and install 0.5.0: Cowork upload zip per CLAUDE.md "Package for Cowork" (python zipfile from the VM, posix entry names), and terminal reinstall. Bump nothing; it is already 0.5.0.
-3. First live test in a real Propfein session: correct Claude on something ("no, I told you ..."), confirm a `## Rules` line lands in NORTHSTAR.md, and in the terminal confirm the Ledger line appears after an edit. Then run `/no-dumb-zone:northstar drift` once.
-4. Suggest `git init` in propfein: drift and Cowork catch-up both lean on git history, and the folder has none.
-5. Fix what the live test shows; likely candidates are false-positive corrections and the Cowork Ledger line being skipped.
+1. CJ uploads `dist\no-dumb-zone-plugin.zip` under Customize > Plugins > Add > Upload plugin (replaces 0.4.x; syncs to the terminal as no-dumb-zone@synced). Start a FRESH task after, not a running one (re-sync gotcha in CLAUDE.md).
+2. First live test in a real Propfein session: correct Claude on something ("no, I told you ..."), confirm a `## Rules` line lands in NORTHSTAR.md; in the terminal confirm the Ledger line appears after an edit. Then run `/no-dumb-zone:northstar drift` once.
+3. Watch how an empty `## Now` behaves live: the hook skips it (steeringText drops empty sections) and the band shows no star. When CJ picks a phase: `/no-dumb-zone:northstar phase <text>`.
+4. `git init` in propfein if CJ agrees: drift and Cowork catch-up lean on git history.
+5. Fix what the live test shows; likely false-positive corrections and the Cowork Ledger line being skipped.
 
 ## Open questions for the user
-- Propfein Now: closing-line capture on a schedule + sigma calibration from box scores?
-- Propfein Not yet: no public signups/payments, no new sports for now?
-- Propfein Bar: numbers checked against a real source; every bet traceable to its inputs; nothing ships untested against the real Supabase data shape. Right, or what's missing?
+- Propfein Now: which comes first, closing-line capture or sigma calibration (or something else)?
+- OK to `git init` propfein?
 
 ## Files touched
 - scripts/ndz-northstar.js: new, the North Star hook (prompt anchoring, correction capture, Ledger)
@@ -33,4 +32,4 @@
 - .claude-plugin/plugin.json: 0.5.0, new description and keywords
 - README.md: North Star section
 - CLAUDE.md: North Star test command and conventions
-- (outside this repo) propfein/NORTHSTAR.md: draft, unconfirmed
+- (outside this repo) propfein/NORTHSTAR.md: confirmed by CJ 2026-10-12, Now empty until he picks
