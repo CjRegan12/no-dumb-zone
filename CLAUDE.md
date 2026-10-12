@@ -12,6 +12,8 @@ Claude Code plugin: Stop hook forces a handoff past a token limit, PermissionReq
 - Live test in Cowork without a re-upload: inside the task, `/no-dumb-zone:limit 1000` (or, on a synced copy older than 0.2.2, `echo 1000 > ~/.claude/plugins/data/no-dumb-zone-synced/limit` in the workspace shell, not the device). To also test unreleased script changes, copy them over the synced copy under `~/.claude/plugins/synced/*/no-dumb-zone/scripts/`; hook scripts are read at exec time, so the next Stop runs the new code. Both are per-container and vanish with the task.
 - Package for Cowork: from the repo root, `mkdir dist -Force; tar -a -c -f dist\no-dumb-zone-plugin.zip .claude-plugin/plugin.json .gitignore README.md hooks scripts skills` (only `plugin.json` from `.claude-plugin/`; `marketplace.json` is for `claude plugin marketplace add CjRegan12/no-dumb-zone` and stays out of the upload) (`dist/` is gitignored). Never `Compress-Archive`: it writes backslash entry names that Linux unzippers read as flat filenames. Upload under Customize > Plugins > Add > Upload plugin; it syncs to terminal sessions as `no-dumb-zone@synced`. From the Cowork VM there is no `tar -a` zip support; `python3` + `zipfile` writing `f.as_posix()` entry names over the same file set gives an equivalent archive.
 
+- North Star tests: `node scripts/test-northstar.js` (39 cases, plain node, no bash needed; drives `ndz-northstar.js` through fake sessions with `NDZ_SURFACE` pinned per case).
+
 ## Conventions and why
 
 - Hook scripts are Node, exec form (`"command": "node", "args": [...]`). `node` is the only interpreter name that resolves identically on Windows, macOS, Linux and the Cowork VM. Do not switch back to `python3` or bash+jq; `python3` does not resolve on Windows.
@@ -31,6 +33,11 @@ Claude Code plugin: Stop hook forces a handoff past a token limit, PermissionReq
 - Mod and hook talk through the `handoff-<session id>` marker. `Handoff now` writes it before submitting the handoff prompt, so a later over-limit stop reminds instead of re-running. The mod's `classic.Stop` hook wraps `ndz-check.js`: marker absent before and present after means the handoff turn is starting; present before means it just ended, which is when `/clear` is put in the prompt box.
 
 - `/no-dumb-zone:limit show` prints `context now` (0.4.1), the Cowork meter. `contextTokens` lives in `ndz-common.js` and is shared with the Stop hook, so the two always agree. A skill's script gets no `transcript_path`, so the skill passes `--session "${CLAUDE_SESSION_ID}"` (Claude Code does substitute it in skill Markdown; seen in a headless run) and `findTranscript` looks up `<config dir>/projects/*/<id>.jsonl`, falling back to the most recently written transcript.
+
+- North Star (0.5.0): `NORTHSTAR.md` in the project root holds what the user wants. `scripts/ndz-northstar.js` runs on both `UserPromptSubmit` and `Stop` (dispatch on `hook_event_name`). The hooks, the `northstar` skill and the handoff skill all read sections by heading name (`## Vision`, `## Now`, `## Not yet`, `## Bar`, `## Rules`, `## Ledger`), so renaming a heading breaks them; change all three together.
+- North Star in Cowork: the hook cannot read or write the project folder, so it only instructs (read the file from the device folder, add your own Ledger line). In the terminal the hook injects the file itself and upserts the session's Ledger line after every turn that edits files, tagged `<!-- ndz:<first 8 of session id> -->` so the same session updates one line instead of adding many.
+- Correction capture is regex (`CORRECTION_RE` in `ndz-northstar.js`), deliberately loose: Claude decides standing rule vs one-off. The Stop check blocks at most once per flagged prompt, and accepts either a tool call that mentions `NORTHSTAR.md` (Edit/Write or a device_bash command) or the reply line `North Star: one-off, not saved`. Keep that string identical in the prompt text and the check.
+- The mod shows the current phase on the band (`★ <first line of ## Now>`) by reading `NORTHSTAR.md` from `$.session.cwd()`; terminal only, like the rest of the mod.
 
 ## Gotchas
 
