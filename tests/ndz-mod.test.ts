@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'claude-code/testing'
-import type { On } from 'claude-code'
+import type { On, SessionMeasureInput } from 'claude-code'
 
 const DATA = '/data/ndz'
 const BAND = {
@@ -52,7 +52,18 @@ function world(on: On, env: Record<string, string>, files: Record<string, string
     return { isFilled: true }
   })
   on('turn.complete', (_$, e) => ({ text: e.answer }))
-  return { submitted, box, files }
+  const opened: string[] = []
+  on('ui.open', (_$, e) => {
+    opened.push(e.id)
+    return { value: { isPlaced: true } }
+  })
+  const toasts: string[] = []
+  on('ui.toast', (_$, e) => {
+    toasts.push(e.text)
+    return { value: undefined }
+  })
+  on('session.measure', (_$, e) => ({ changed: e.changed }))
+  return { submitted, box, files, opened, toasts }
 }
 
 const MARKER = `${DATA}/handoff-s1`
@@ -140,4 +151,66 @@ test('in Cowork the prompt box is never filled', async ($, on) => {
   await $.command.run(run(''))
   await $.turn.complete(turnEnds)
   expect(w.box.text).toBe('')
+})
+
+const DASH = {
+  plugin: 'no-dumb-zone',
+  component: 'Pane',
+  requestId: 'ndz-dash',
+  props: {
+    title: 'No Dumb Zone',
+    isFocused: false,
+    bodyColumns: 40,
+    placement: 'dock',
+    scroll: { offset: 0, bodyRows: 20 },
+    view: {},
+  },
+} as const
+
+/** The engine's measure after a turn, at this many tokens. */
+function measured(tokens: number): SessionMeasureInput {
+  return { context: { tokens, window: 1000000 }, rateLimits: [], changed: ['context'] }
+}
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`${surface}: the dashboard shows the gauge, growth per turn and turns left`, async ($, on) => {
+    const w = world(on, { NDZ_SURFACE: 'terminal' }, {}, 600000)
+    expect((await $.command.run(run('dash'))).text).toBe('Dashboard open.')
+    expect(w.opened).toEqual(['ndz-dash'])
+    for (const t of [600000, 640000, 680000, 720000]) await $.session.measure(measured(t))
+
+    const ui = await $.ui.mount({ ...DASH, surface })
+    expect(await ui.find({ type: 'Text', text: /720k \/ 900k\s+80%/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /\+40k avg/ })).toBeDefined()
+    // (900k - 720k) / 40k a turn = 4.5, so about 5 turns.
+    expect(await ui.find({ type: 'Text', text: /~5 at this pace/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'clear to work' })).toBeDefined()
+
+    await ui.press({ key: 'ndz-dash-handoff' })
+    expect(w.submitted.length).toBe(1)
+    await ui.unmount()
+  })
+}
+
+test('the dashboard opens on its own at 80%, once', async ($, on) => {
+  const w = world(on, { NDZ_SURFACE: 'terminal' }, {}, 500000)
+  await $.session.measure(measured(500000))
+  expect(w.opened).toEqual([])
+  await $.session.measure(measured(730000))
+  await $.session.measure(measured(760000))
+  expect(w.opened).toEqual(['ndz-dash'])
+})
+
+test('the limit picker writes the limit file the Stop hook reads', async ($, on) => {
+  const w = world(on, { NDZ_SURFACE: 'terminal' }, {}, 300000)
+  await $.session.measure(measured(300000))
+  const ui = await $.ui.mount({ ...DASH, surface: 'terminal' })
+  await ui.select({ key: 'ndz-dash-limit', value: '600000' })
+  expect(w.files[`${DATA}/limit`]).toBe('600000\n')
+  expect((await $.command.run(run(''))).text).toContain('of 600,000 tokens (50%), limit from the limit file')
+
+  await ui.select({ key: 'ndz-dash-limit', value: 'default' })
+  expect(w.files[`${DATA}/limit`]).toBe('')
+  expect((await $.command.run(run(''))).text).toContain('limit from the default')
+  await ui.unmount()
 })

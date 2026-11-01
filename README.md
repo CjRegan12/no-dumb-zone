@@ -20,6 +20,21 @@ On Claude Code 2.1.287 or later the plugin also loads a small [mod](https://code
 - **A line above the prompt** in the terminal and the desktop app's Code tab: `NDZ 212k / 900k  24%`, dim until 80% of the limit, then highlighted. The count is Claude Code's own context figure, refreshed after every turn.
 - **A `Handoff now` button** on that line, and `/ndz handoff` for the keyboard. Either one runs the same handoff the hook would, before the limit.
 - **`/clear` waiting in the prompt box** once the handoff turn ends, so starting fresh is one Enter. A draft you are typing is never overwritten; the line then shows a `Put /clear in the prompt` button instead.
+- **A dashboard pane**, opened with `/ndz dash` or the `Dashboard` button on that line, and on its own the first time a session reaches 80%:
+
+  ```
+  720k / 900k                      80%
+  ██████████████████████████████░░░░░░░░
+  limit from the default
+
+  per turn  ▁▃▄▄▆█▅▃  +40k avg
+  turns left  ~5 at this pace
+  status      clear to work
+
+  [ Handoff now ]   Limit: default (900k) ▾
+  ```
+
+  The growth line is the context each recent turn added; turns left divides what is left of the limit by the average of the last five. The limit picker writes the same limit file `/no-dumb-zone:limit` does (it is greyed out while `NDZ_LIMIT` is set, which always wins). `h` presses Handoff now while the pane has focus.
 - **`/ndz`**, which prints the same figures as text. It runs without a model turn, and it is the way to read the meter where nothing is drawn, such as `claude -p`.
 
 Nothing here is needed for the handoff to work. Where the mod does not load, or draws nothing, the plugin behaves exactly as before.
@@ -104,7 +119,7 @@ Run `/context` in a session to see your window size and current usage.
 no-dumb-zone/
   .claude-plugin/plugin.json
   hooks/hooks.json                three hooks, exec form, node, plus the mod's entry under "modules"
-  hooks/register.ts               the mod: meter above the prompt, Handoff now, /ndz, /clear prefill
+  hooks/register.ts               the mod: meter above the prompt, dashboard pane, Handoff now, /ndz, /clear prefill
   scripts/ndz-check.js            Stop: measure context, force the handoff once, then nag
   scripts/ndz-allow-handoff.js    PermissionRequest: approve the Skill call for this plugin's handoff, nothing else
   scripts/ndz-pickup.js           UserPromptSubmit: brief (and in the terminal, name) the new session from NOTES.md
