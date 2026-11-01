@@ -7,9 +7,9 @@ Long sessions compacted over and over lose the constraints you stated early, and
 ## What it does
 
 1. Every time Claude finishes a turn, a `Stop` hook reads the session transcript and checks the live context size.
-2. Past the limit (default 500k tokens in the terminal, 600k in Cowork, see below), the hook blocks the stop once and tells Claude to run `/no-dumb-zone:handoff`.
+2. Past the limit (default 900k tokens in the terminal, 600k in Cowork, see below), the hook blocks the stop once and tells Claude to run `/no-dumb-zone:handoff`.
 3. The handoff skill updates `CLAUDE.md` with durable learnings, writes `NOTES.md` with task state and next steps, commits, and tells you how to start fresh (`/clear` in the terminal, a new task in Cowork).
-4. On your first prompt in the fresh session, a `UserPromptSubmit` hook briefs Claude from `NOTES.md`. In the terminal it also names the session from the file's first line. You continue where you left off at ~20k tokens instead of 500k.
+4. On your first prompt in the fresh session, a `UserPromptSubmit` hook briefs Claude from `NOTES.md`. In the terminal it also names the session from the file's first line. You continue where you left off at ~20k tokens instead of 900k.
 
 It never interrupts a task. `Stop` only fires when Claude has stopped on its own, so a task in progress always finishes first.
 
@@ -17,7 +17,7 @@ It never interrupts a task. `Stop` only fires when Claude has stopped on its own
 
 On Claude Code 2.1.287 or later the plugin also loads a small [mod](https://code.claude.com/docs/en/plugins/mods/overview), `hooks/register.ts`. It changes nothing about when the handoff fires; the hooks above still own that. It adds:
 
-- **A line above the prompt** in the terminal and the desktop app's Code tab: `NDZ 212k / 500k  42%`, dim until 80% of the limit, then highlighted. The count is Claude Code's own context figure, refreshed after every turn.
+- **A line above the prompt** in the terminal and the desktop app's Code tab: `NDZ 212k / 900k  24%`, dim until 80% of the limit, then highlighted. The count is Claude Code's own context figure, refreshed after every turn.
 - **A `Handoff now` button** on that line, and `/ndz handoff` for the keyboard. Either one runs the same handoff the hook would, before the limit.
 - **`/clear` waiting in the prompt box** once the handoff turn ends, so starting fresh is one Enter. A draft you are typing is never overwritten; the line then shows a `Put /clear in the prompt` button instead.
 - **`/ndz`**, which prints the same figures as text. It runs without a model turn, and it is the way to read the meter where nothing is drawn, such as `claude -p`.
@@ -82,7 +82,7 @@ Use `tar -a`, not `Compress-Archive`: the latter writes backslash entry names th
 
 | Setting | Where | Default | Notes |
 | --- | --- | --- | --- |
-| `NDZ_LIMIT` | `env` block in `~/.claude/settings.json` (`%USERPROFILE%\.claude\settings.json` on Windows), or a project's `.claude/settings.json` | `500000` terminal, `600000` Cowork | Tokens. Cowork's default is higher because a Cowork task already carries ~130k of system prompt and tool schemas before you type. Both defaults favor long sessions over the published long-context data, which bends around 256k; lower them if you see quality slip. Must be below your auto-compact point or the hook never fires. On a 200k model use ~130000. |
+| `NDZ_LIMIT` | `env` block in `~/.claude/settings.json` (`%USERPROFILE%\.claude\settings.json` on Windows), or a project's `.claude/settings.json` | `900000` terminal, `600000` Cowork | Tokens. The terminal default sits just under the ~967k auto-compact point of a 1M window, so long sessions run nearly to the end and still hand off. Cowork's default is lower; a Cowork task already carries ~130k of system prompt and tool schemas before you type. Both defaults favor long sessions over the published long-context data, which bends around 256k; lower them if you see quality slip. Must be below your auto-compact point or the hook never fires. On a 200k model use ~130000. |
 | `autoCompactEnabled` | same settings file | `true` | Set `false` to let this plugin replace compaction instead of racing it. |
 | `/no-dumb-zone:limit` | a skill; `/no-dumb-zone:limit 100000`, `100k`, `show`, `clear` | | Writes, prints or removes the `limit` file below and tells you which limit the hook will actually use. `show` also prints the session's current context against that limit. Works in the terminal and inside a Cowork task. Claude also runs it when you say "lower the handoff limit to 100k". |
 | `limit` file | `$CLAUDE_PLUGIN_DATA/limit` (`~/.claude/plugins/data/no-dumb-zone-synced/limit` for the uploaded plugin, `.../no-dumb-zone-inline/limit` for `--plugin-dir`) | none | One number. Used when `NDZ_LIMIT` is unset. The only way to change the limit from inside a Cowork task, where env vars can't be set. In the terminal it persists across sessions; a Cowork container is thrown away with the task, so there it lasts one task, and the handoff's paste line carries it into the next (limits under 10k excepted). |

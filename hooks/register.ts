@@ -6,7 +6,7 @@
 // works unchanged wherever it does not (Claude Code before 2.1.287, or a
 // surface that draws nothing).
 //
-//   band        NDZ 212k / 500k  42%   [ Handoff now ]
+//   band        NDZ 212k / 900k  24%   [ Handoff now ]
 //   /ndz        the same figures as text, for surfaces that draw no band
 //   /ndz handoff  what the button does
 //   after the handoff is written: puts /clear in an empty prompt box
@@ -19,7 +19,7 @@
 import type { EngineInterface, Register } from 'claude-code'
 
 const PLUGIN = 'no-dumb-zone'
-const DEFAULT_LIMIT_TERMINAL = 500000
+const DEFAULT_LIMIT_TERMINAL = 900000
 const DEFAULT_LIMIT_COWORK = 600000
 const TEST_SIZED_BELOW = 10000
 

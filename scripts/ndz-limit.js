@@ -12,7 +12,7 @@
  *              to most recently. The skill passes ${CLAUDE_SESSION_ID}.
  *   clear      delete DIR/limit; the hook goes back to NDZ_LIMIT or the default.
  *
- * The Stop hook reads NDZ_LIMIT, then DIR/limit, then the surface default (500000 terminal, 600000 Cowork). Hooks get DIR from
+ * The Stop hook reads NDZ_LIMIT, then DIR/limit, then the surface default (900000 terminal, 600000 Cowork). Hooks get DIR from
  * Claude Code as CLAUDE_PLUGIN_DATA; the Bash tool does not, so the skill passes
  * ${CLAUDE_PLUGIN_DATA} in as --data-dir. Without it this falls back to the same
  * place the hooks fall back to (ndz-common dataDir()).

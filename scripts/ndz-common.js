@@ -61,13 +61,14 @@ function pruneOldMarkers() {
 
 /** Default limits by surface. A Cowork task starts at roughly 130k tokens of
  *  context before Claude's first turn (Cowork's system prompt plus every
- *  connector's tool schema); the terminal starts far lower. The higher Cowork
- *  default gives both surfaces about the same working room. Both sit above
+ *  connector's tool schema); the terminal starts far lower. The terminal
+ *  default (900k since 0.4.3; 500k cut long sessions off midway) sits ~67k
+ *  under the ~967k auto-compact point so the handoff still fires first. Both sit above
  *  where the published long-context data bends (~256k): the author chose
  *  session length over caution. Lower them with /no-dumb-zone:limit or
  *  NDZ_LIMIT; the plugin still catches the real failure, which is sitting at
  *  the ~967k auto-compact point for hours. */
-const DEFAULT_LIMIT_TERMINAL = 500000;
+const DEFAULT_LIMIT_TERMINAL = 900000;
 const DEFAULT_LIMIT_COWORK = 600000;
 function defaultLimit() {
   return isCowork() ? DEFAULT_LIMIT_COWORK : DEFAULT_LIMIT_TERMINAL;

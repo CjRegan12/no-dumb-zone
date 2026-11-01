@@ -63,7 +63,7 @@ function world(on: On, env: Record<string, string>, files: Record<string, string
 test('/ndz reports context against the terminal default', async ($, on) => {
   world(on, { NDZ_SURFACE: 'terminal' }, {}, 212000)
   const answer = await $.command.run(run(''))
-  expect(answer.text).toBe('212,000 of 500,000 tokens (42%), limit from the default.')
+  expect(answer.text).toBe('212,000 of 900,000 tokens (24%), limit from the default.')
 })
 
 test('the limit file beats the default, NDZ_LIMIT beats the file, Cowork has its own default', async ($, on) => {
@@ -83,7 +83,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     const w = world(on, { NDZ_SURFACE: 'terminal' }, {}, 212000)
     await $.command.run(run(''))
     const ui = await $.ui.mount({ ...BAND, surface })
-    expect(await ui.find({ type: 'Text', text: /NDZ 212k \/ 500k {2}42%/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /NDZ 212k \/ 900k {2}24%/ })).toBeDefined()
 
     await ui.press({ key: 'ndz-handoff' })
     expect(w.submitted.length).toBe(1)
