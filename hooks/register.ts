@@ -10,6 +10,7 @@
 //   /ndz        the same figures as text, for surfaces that draw no band
 //   /ndz handoff  what the button does
 //   after the handoff is written: puts /clear in an empty prompt box
+//   (scripts/ndz-check.js leaves handoff-<id>.done at the stop that ends it)
 //
 // The limit is resolved exactly as scripts/ndz-common.js resolveLimit() does:
 // NDZ_LIMIT, then <data dir>/limit, then the surface default. Keep the two in
@@ -100,10 +101,21 @@ async function refresh($: EngineInterface): Promise<void> {
     source = 'default'
   }
 
+  // handoff-<id> means a handoff was started; handoff-<id>.done, written by
+  // scripts/ndz-check.js at the stop that ends the handoff turn, means it is written.
   const marker = await markerPath($)
   const hasMarker = marker !== '' && (await $.fs.exists(marker))
+  const isWritten = hasMarker && (await $.fs.exists(`${marker}.done`))
   if (!hasMarker) phase = 'idle'
-  else if (phase === 'idle') phase = 'done'
+  else if (isWritten) phase = 'done'
+  else phase = 'writing'
+}
+
+/** Once the handoff is written, offers /clear (once per session). */
+async function afterTurn($: EngineInterface): Promise<void> {
+  await refresh($)
+  if (phase === 'done') await offerClear($)
+  $.ui.invalidate('ui.render')
 }
 
 function statusLine(): string {
@@ -169,8 +181,7 @@ export const register: Register = on => {
   // After each turn: the fill moved.
   on('session.measure', async ($, e, next) => {
     tokens = e.context.tokens
-    await refresh($)
-    $.ui.invalidate('ui.render')
+    await afterTurn($)
     return next(e)
   })
 
@@ -182,23 +193,16 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // Wraps the plugin's own Stop hook (scripts/ndz-check.js), which writes the
-  // marker the first time it sends Claude off to write the handoff. A marker
-  // that was there before this stop means the handoff turn itself just ended.
-  on('classic.Stop', async ($, e, next) => {
-    if (e.agent_id) return next(e)
-    const marker = await markerPath($)
-    const hadMarker = marker !== '' && (await $.fs.exists(marker))
+  // When a turn ends, scripts/ndz-check.js (the plugin's Stop hook) has already
+  // run and, if this was the handoff turn, left handoff-<id>.done. This used to
+  // wrap classic.Stop, but cc-plugin-sec-default skips installed plugins' hooks
+  // on classic.Stop on managed, Team and Enterprise setups, so the mod reads the
+  // marker files instead. session.measure checks too, whichever comes last wins.
+  on('turn.complete', async ($, e, next) => {
     const result = await next(e)
-    const hasMarker = marker !== '' && (await $.fs.exists(marker))
-    if (hasMarker && !hadMarker) phase = 'writing'
-    if (hadMarker && phase !== 'done') {
-      phase = 'done'
-      await offerClear($)
-    }
-    $.ui.invalidate('ui.render')
+    if (!e.agentId) await afterTurn($)
     return result
-    // If this hook fails, the plugin's Stop hook must still run.
+    // If this hook fails, the turn still ends normally.
   }).catch(($, e, next) => next(e))
 
   on('command.run', { command: 'ndz' }, async ($, e) => {

@@ -51,14 +51,20 @@ function world(on: On, env: Record<string, string>, files: Record<string, string
     box.text = e.text
     return { isFilled: true }
   })
-  // The plugin's own Stop hook, standing beneath the mod as in a session.
-  const stop = { writesMarker: false }
-  on('classic.Stop', () => {
-    if (stop.writesMarker) files[`${DATA}/handoff-s1`] ??= String(tokens)
-    return {}
-  })
-  return { submitted, box, files, stop }
+  on('turn.complete', (_$, e) => ({ text: e.answer }))
+  return { submitted, box, files }
 }
+
+const MARKER = `${DATA}/handoff-s1`
+
+/** A main-loop turn ending, after the plugin's Stop hook (ndz-check.js) ran. */
+const turnEnds = {
+  answer: 'done',
+  durationMs: 1,
+  isAborted: false,
+  turnId: 't1',
+  reason: 'answer',
+} as const
 
 test('/ndz reports context against the terminal default', async ($, on) => {
   world(on, { NDZ_SURFACE: 'terminal' }, {}, 212000)
@@ -99,32 +105,39 @@ for (const surface of ['terminal', 'desktop'] as const) {
   })
 }
 
-test('when the handoff turn stops, /clear goes into an empty prompt box', async ($, on) => {
-  const w = world(on, { NDZ_SURFACE: 'terminal' }, {}, 520000)
+test('when the handoff turn ends, /clear goes into an empty prompt box', async ($, on) => {
+  const w = world(on, { NDZ_SURFACE: 'terminal' }, {}, 920000)
   await $.command.run(run(''))
 
-  // First stop over the limit: the plugin's Stop hook writes the marker.
-  w.stop.writesMarker = true
-  await $.classic.Stop({ stop_hook_active: false })
+  // First stop over the limit: ndz-check.js writes the marker and sends Claude off.
+  w.files[MARKER] = '920000'
+  await $.turn.complete(turnEnds)
   expect(w.box.text).toBe('')
   expect((await $.command.run(run(''))).text).toContain('Handoff in progress.')
 
-  // The handoff turn ends: the marker was already there.
-  await $.classic.Stop({ stop_hook_active: true })
+  // The handoff turn's stop: ndz-check.js leaves the .done marker.
+  w.files[`${MARKER}.done`] = ''
+  await $.turn.complete(turnEnds)
   expect(w.box.text).toBe('/clear')
   expect((await $.command.run(run(''))).text).toContain('Handoff written')
 })
 
+test('a subagent ending does not count as the handoff turn', async ($, on) => {
+  const w = world(on, { NDZ_SURFACE: 'terminal' }, { [MARKER]: '1', [`${MARKER}.done`]: '' }, 920000)
+  await $.turn.complete({ ...turnEnds, agentId: 'a1' })
+  expect(w.box.text).toBe('')
+})
+
 test('a draft in the prompt box is left alone', async ($, on) => {
-  const w = world(on, { NDZ_SURFACE: 'terminal' }, { [`${DATA}/handoff-s1`]: '1' }, 520000)
+  const w = world(on, { NDZ_SURFACE: 'terminal' }, { [MARKER]: '1', [`${MARKER}.done`]: '' }, 920000)
   w.box.text = 'half a thought'
-  await $.classic.Stop({ stop_hook_active: true })
+  await $.turn.complete(turnEnds)
   expect(w.box.text).toBe('half a thought')
 })
 
 test('in Cowork the prompt box is never filled', async ($, on) => {
-  const w = world(on, { NDZ_SURFACE: 'cowork' }, { [`${DATA}/handoff-s1`]: '1' }, 620000)
+  const w = world(on, { NDZ_SURFACE: 'cowork' }, { [MARKER]: '1', [`${MARKER}.done`]: '' }, 620000)
   await $.command.run(run(''))
-  await $.classic.Stop({ stop_hook_active: true })
+  await $.turn.complete(turnEnds)
   expect(w.box.text).toBe('')
 })

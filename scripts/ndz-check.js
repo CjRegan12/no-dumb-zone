@@ -37,8 +37,26 @@ const {
 function main() {
   const inp = readHookInput();
 
-  // Stay out of subagents and out of the handoff turn itself.
-  if (inp.agent_id || inp.stop_hook_active) return 0;
+  // Stay out of subagents.
+  if (inp.agent_id) return 0;
+
+  // A stop with the handoff marker already in place ends the handoff turn:
+  // the continuation this hook forced, or the turn the mod's Handoff now
+  // button started. Leave <marker>.done so the mod can put /clear in the
+  // prompt box without hooking Stop itself; cc-plugin-sec-default keeps
+  // installed plugins out of classic.Stop on managed, Team and Enterprise
+  // setups, so this script is the one place that reliably sees the stop.
+  const marker = markerPath("handoff", inp.session_id);
+  if (fs.existsSync(marker) && !fs.existsSync(`${marker}.done`)) {
+    try {
+      fs.writeFileSync(`${marker}.done`, "");
+    } catch {
+      /* the mod just won't offer /clear */
+    }
+  }
+
+  // Stay out of the handoff turn itself.
+  if (inp.stop_hook_active) return 0;
 
   const { limit, source } = resolveLimit();
 
@@ -47,7 +65,6 @@ function main() {
   const ctx = contextTokens(inp.transcript_path);
   if (ctx < limit) return 0;
 
-  const marker = markerPath("handoff", inp.session_id);
   const fmt = (n) => n.toLocaleString("en-US");
   const cowork = isCowork();
 
